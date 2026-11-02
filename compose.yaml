@@ -1,0 +1,39 @@
+# Local stack: PostgreSQL + LedgerForge.
+#   docker compose up --build        -> API on http://localhost:8080
+#   docker compose up -d postgres    -> database only, then ./mvnw spring-boot:run
+name: ledgerforge
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ledgerforge
+      POSTGRES_USER: ledgerforge
+      POSTGRES_PASSWORD: ledgerforge
+    ports:
+      - "5437:5432"   # 5437 on the host to avoid clashing with a local PostgreSQL
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledgerforge -d ledgerforge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LEDGERFORGE_DB_URL: jdbc:postgresql://postgres:5432/ledgerforge
+      LEDGERFORGE_DB_USER: ledgerforge
+      LEDGERFORGE_DB_PASSWORD: ledgerforge
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs   # one JSON object per log line
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:
