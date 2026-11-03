@@ -13,3 +13,4 @@ context, decision, consequences.
 | [0005](0005-idempotency-in-the-business-transaction.md) | Idempotency keys stored in the business transaction | Accepted |
 | [0006](0006-jpa-entities-as-domain-model.md) | JPA-annotated entities as the domain model | Accepted |
 | [0007](0007-real-postgres-in-tests.md) | Real PostgreSQL (Testcontainers) in tests, no H2 | Accepted |
+| [0008](0008-sealed-domain-exceptions-and-one-error-shape.md) | Sealed domain exceptions and one error shape | Accepted |

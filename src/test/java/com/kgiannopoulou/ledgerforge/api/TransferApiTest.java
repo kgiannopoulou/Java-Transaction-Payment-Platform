@@ -49,7 +49,7 @@ class TransferApiTest extends IntegrationTest {
         var response = transfer(alice, bob, "10.01", "EUR");
 
         assertThat(response.status()).isEqualTo(422);
-        assertThat(response.code()).isEqualTo("insufficient_funds");
+        assertThat(response.code()).isEqualTo("INSUFFICIENT_FUNDS");
         assertThat(balanceOf(alice)).isEqualByComparingTo("10.00");
         assertThat(balanceOf(bob)).isEqualByComparingTo("0.00");
         assertThat(api.get("/api/v1/accounts/" + bob + "/transactions").body()).containsEntry("totalItems", 0);
@@ -60,7 +60,7 @@ class TransferApiTest extends IntegrationTest {
         UUID alice = newFundedWallet("EUR", "10.00");
         var response = transfer(alice, alice, "1.00", "EUR");
         assertThat(response.status()).isEqualTo(422);
-        assertThat(response.code()).isEqualTo("same_account");
+        assertThat(response.code()).isEqualTo("SAME_ACCOUNT");
     }
 
     @Test
@@ -68,7 +68,7 @@ class TransferApiTest extends IntegrationTest {
         UUID alice = newFundedWallet("EUR", "10.00");
         var response = transfer(alice, UUID.randomUUID(), "1.00", "EUR");
         assertThat(response.status()).isEqualTo(404);
-        assertThat(response.code()).isEqualTo("account_not_found");
+        assertThat(response.code()).isEqualTo("ACCOUNT_NOT_FOUND");
     }
 
     @Test
@@ -79,7 +79,7 @@ class TransferApiTest extends IntegrationTest {
 
         var response = transfer(alice, bob, "1.00", "EUR");
         assertThat(response.status()).isEqualTo(422);
-        assertThat(response.code()).isEqualTo("account_not_active");
+        assertThat(response.code()).isEqualTo("ACCOUNT_FROZEN");
         assertThat(balanceOf(alice)).isEqualByComparingTo("10.00");
     }
 
@@ -89,8 +89,8 @@ class TransferApiTest extends IntegrationTest {
         UUID usd = newWallet("USD");
         UUID otherEur = newWallet("EUR");
 
-        assertThat(transfer(eur, usd, "1.00", "EUR").code()).isEqualTo("currency_mismatch");
-        assertThat(transfer(eur, otherEur, "1.00", "USD").code()).isEqualTo("currency_mismatch");
+        assertThat(transfer(eur, usd, "1.00", "EUR").code()).isEqualTo("CURRENCY_MISMATCH");
+        assertThat(transfer(eur, otherEur, "1.00", "USD").code()).isEqualTo("CURRENCY_MISMATCH");
     }
 
     @Test
@@ -99,7 +99,7 @@ class TransferApiTest extends IntegrationTest {
         UUID holds = UUID.fromString("00000000-0000-0000-0000-00000000a001");
         var response = transfer(alice, holds, "1.00", "EUR");
         assertThat(response.status()).isEqualTo(422);
-        assertThat(response.code()).isEqualTo("not_a_wallet");
+        assertThat(response.code()).isEqualTo("NOT_A_WALLET");
     }
 
     @Test
@@ -110,7 +110,7 @@ class TransferApiTest extends IntegrationTest {
         assertThat(transfer(alice, bob, "-1.00", "EUR").status()).isEqualTo(400);
         var precision = transfer(alice, bob, "0.001", "EUR");
         assertThat(precision.status()).isEqualTo(400);
-        assertThat(precision.code()).isEqualTo("invalid_amount");
+        assertThat(precision.code()).isEqualTo("INVALID_AMOUNT");
         assertThat(api.post("/api/v1/transfers", "not json").status()).isEqualTo(400);
     }
 }

@@ -72,7 +72,7 @@ class PaymentStateMachineTest {
         payment.recordRefund(eur("50.00"), NOW);
 
         assertThatThrownBy(() -> payment.markCaptured(NOW))
-                .isInstanceOf(InvalidPaymentTransitionException.class)
+                .isInstanceOf(PaymentAlreadyCapturedException.class)
                 .hasMessageContaining("REFUNDED to CAPTURED");
     }
 
@@ -93,7 +93,7 @@ class PaymentStateMachineTest {
         Payment payment = newPayment("50.00");
         payment.markAuthorized(NOW);
         assertThatThrownBy(() -> payment.recordRefund(eur("10.00"), NOW))
-                .isInstanceOf(InvalidPaymentTransitionException.class);
+                .isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test
@@ -114,7 +114,7 @@ class PaymentStateMachineTest {
         Payment captured = newPayment("10.00");
         captured.markAuthorized(NOW);
         captured.markCaptured(NOW);
-        assertThatThrownBy(() -> captured.markCancelled(NOW)).isInstanceOf(InvalidPaymentTransitionException.class);
+        assertThatThrownBy(() -> captured.markCancelled(NOW)).isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test

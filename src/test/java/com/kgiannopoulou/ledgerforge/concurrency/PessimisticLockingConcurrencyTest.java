@@ -72,7 +72,7 @@ class PessimisticLockingConcurrencyTest extends IntegrationTest {
                 .collect(Collectors.groupingBy(ApiClient.Response::status, Collectors.counting()));
         assertThat(byStatus).containsEntry(201, 1L).containsEntry(422, 99L);
         assertThat(responses).filteredOn(r -> r.status() == 422)
-                .allSatisfy(r -> assertThat(r.code()).isEqualTo("insufficient_funds"));
+                .allSatisfy(r -> assertThat(r.code()).isEqualTo("INSUFFICIENT_FUNDS"));
         assertThat(balanceOf(alice)).isEqualByComparingTo("0.00");
 
         List<UUID> all = new ArrayList<>(attackers);

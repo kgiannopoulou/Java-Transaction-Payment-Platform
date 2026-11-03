@@ -6,6 +6,6 @@ import com.kgiannopoulou.ledgerforge.shared.error.InvalidRequestException;
 public class InvalidMoneyException extends InvalidRequestException {
 
     public InvalidMoneyException(String message) {
-        super("invalid_amount", message);
+        super("INVALID_AMOUNT", message);
     }
 }

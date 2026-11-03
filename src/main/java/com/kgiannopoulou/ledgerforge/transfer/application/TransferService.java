@@ -52,10 +52,10 @@ public class TransferService {
     public Transfer transfer(TransferCommand command) {
         Money amount = command.amount();
         if (!amount.isPositive()) {
-            throw new BusinessRuleViolationException("invalid_amount", "Transfer amount must be positive");
+            throw new BusinessRuleViolationException("INVALID_AMOUNT", "Transfer amount must be positive");
         }
         if (command.sourceAccountId().equals(command.destinationAccountId())) {
-            throw new BusinessRuleViolationException("same_account", "Source and destination accounts must differ");
+            throw new BusinessRuleViolationException("SAME_ACCOUNT", "Source and destination accounts must differ");
         }
 
         Map<UUID, Account> locked = accountLocks.lockForBalanceChange(
@@ -65,7 +65,7 @@ public class TransferService {
 
         for (Account account : List.of(source, destination)) {
             if (account.getType() != AccountType.CUSTOMER_WALLET) {
-                throw new BusinessRuleViolationException("not_a_wallet",
+                throw new BusinessRuleViolationException("NOT_A_WALLET",
                         "Transfers are only allowed between customer wallets");
             }
             account.requireActive();

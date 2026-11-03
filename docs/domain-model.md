@@ -68,11 +68,11 @@ Booked synchronously in one transaction, so a committed transfer is always `COMP
 Validation (in this order, balance-dependent checks **after** taking locks):
 
 1. amount > 0 and representable in the currency (400)
-2. source ≠ destination (422 `same_account`)
+2. source ≠ destination (422 `SAME_ACCOUNT`)
 3. both accounts exist (404)
-4. both are customer wallets (422 `not_a_wallet`) and ACTIVE (422 `account_not_active`)
-5. currencies of source, destination and request match (422 `currency_mismatch`)
-6. sufficient funds (422 `insufficient_funds`)
+4. both are customer wallets (422 `NOT_A_WALLET`) and ACTIVE (422 `ACCOUNT_FROZEN` / `ACCOUNT_CLOSED`)
+5. currencies of source, destination and request match (422 `CURRENCY_MISMATCH`)
+6. sufficient funds (422 `INSUFFICIENT_FUNDS`)
 
 ## Payments
 
@@ -91,7 +91,7 @@ CREATED ──► AUTHORIZED ──► CAPTURED ──► PARTIALLY_REFUNDED ─
 
 - The transition table lives in `PaymentStatus` as data (`EnumMap<PaymentStatus, EnumSet<…>>`)
   and is tested exhaustively (every from/to pair).
-- Invalid transitions return **409** `invalid_payment_transition` (e.g. `REFUNDED → CAPTURED`).
+- Invalid transitions return **409** `INVALID_PAYMENT_STATE` (e.g. `CANCELLED → CAPTURED`); capturing a payment that was already captured (`CAPTURED`, `PARTIALLY_REFUNDED`, `REFUNDED → CAPTURED`) returns the more specific **409** `PAYMENT_ALREADY_CAPTURED`.
 - Commands are a **sealed interface** of records:
 
   ```java

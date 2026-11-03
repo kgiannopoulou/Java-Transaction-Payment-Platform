@@ -26,7 +26,7 @@ Every money-moving `POST` accepts an optional `Idempotency-Key` header:
 |-----------|----------|
 | First request with key K | executed; response stored with K |
 | Retry with K and the same request | **stored response replayed**, header `Idempotent-Replayed: true`, no side effects |
-| Retry with K and a **different** request | `409 idempotency_key_reused` |
+| Retry with K and a **different** request | `409 IDEMPOTENCY_KEY_REUSED` (`DuplicateIdempotencyKeyException`) |
 | First request with K failed with a business error (e.g. 422 insufficient funds) | nothing stored; a retry with K executes again |
 | K older than `ledgerforge.idempotency.ttl` (24 h) | treated as a new key |
 | Same K on two different endpoints | independent (keys are namespaced by scope) |

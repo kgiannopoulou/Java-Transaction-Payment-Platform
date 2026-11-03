@@ -112,6 +112,8 @@ the idempotency key.
   so the real concurrency limit is the Hikari pool (20 connections), which is the right place for it.
 - **`open-in-view: false`**: no lazy loading during JSON rendering; transaction boundaries are explicit.
 - **`ddl-auto: validate`**: Flyway owns the schema; Hibernate only checks that the mapping matches.
-- **RFC 9457 problem details** for every error, each with a stable machine-readable `code`.
+- **One error shape** (RFC 9457 problem details) for every error: stable `type`, `title`, `status`,
+  `detail` and a `traceId` that also appears in the `X-Trace-Id` header and in the logs. See
+  [`error-handling.md`](error-handling.md).
 - **Actuator** health (with liveness/readiness probes), info and metrics. Compose enables ECS-format
   structured JSON logs.

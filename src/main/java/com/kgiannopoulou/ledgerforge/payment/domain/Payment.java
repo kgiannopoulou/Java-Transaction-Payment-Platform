@@ -79,10 +79,10 @@ public class Payment extends BaseEntity {
     public static Payment create(UUID payerAccountId, UUID merchantAccountId, Money amount, String description,
                                  Instant now) {
         if (!amount.isPositive()) {
-            throw new BusinessRuleViolationException("invalid_amount", "Payment amount must be positive");
+            throw new BusinessRuleViolationException("INVALID_AMOUNT", "Payment amount must be positive");
         }
         if (payerAccountId.equals(merchantAccountId)) {
-            throw new BusinessRuleViolationException("same_account", "Payer and merchant accounts must differ");
+            throw new BusinessRuleViolationException("SAME_ACCOUNT", "Payer and merchant accounts must differ");
         }
         return new Payment(UUID.randomUUID(), payerAccountId, merchantAccountId, amount, description, now);
     }
@@ -90,7 +90,7 @@ public class Payment extends BaseEntity {
     /** Throws unless {@code target} is reachable from the current status. Call BEFORE moving money. */
     public void requireTransition(PaymentStatus target) {
         if (!status.canTransitionTo(target)) {
-            throw new InvalidPaymentTransitionException(getId(), status, target);
+            throw InvalidPaymentStateException.of(getId(), status, target);
         }
     }
 
@@ -112,11 +112,11 @@ public class Payment extends BaseEntity {
             throw new CurrencyMismatchException(currency, refund.currency());
         }
         if (!refund.isPositive()) {
-            throw new BusinessRuleViolationException("invalid_amount", "Refund amount must be positive");
+            throw new BusinessRuleViolationException("INVALID_AMOUNT", "Refund amount must be positive");
         }
         requireTransition(nextStatusAfterRefund(refund)); // only CAPTURED / PARTIALLY_REFUNDED pass
         if (refund.isGreaterThan(getRefundableAmount())) {
-            throw new BusinessRuleViolationException("refund_exceeds_captured",
+            throw new BusinessRuleViolationException("REFUND_EXCEEDS_CAPTURED",
                     "Refund " + refund + " exceeds refundable amount " + getRefundableAmount());
         }
     }

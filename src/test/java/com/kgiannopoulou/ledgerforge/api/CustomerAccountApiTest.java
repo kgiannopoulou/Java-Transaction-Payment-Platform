@@ -36,14 +36,14 @@ class CustomerAccountApiTest extends IntegrationTest {
         assertThat(api.post("/api/v1/customers", Map.of("email", email, "fullName", "A")).status()).isEqualTo(201);
         var duplicate = api.post("/api/v1/customers", Map.of("email", email.toLowerCase(), "fullName", "B"));
         assertThat(duplicate.status()).isEqualTo(409);
-        assertThat(duplicate.code()).isEqualTo("email_already_registered");
+        assertThat(duplicate.code()).isEqualTo("EMAIL_ALREADY_REGISTERED");
     }
 
     @Test
     void validatesRequests() {
         var invalid = api.post("/api/v1/customers", Map.of("email", "not-an-email", "fullName", ""));
         assertThat(invalid.status()).isEqualTo(400);
-        assertThat(invalid.code()).isEqualTo("validation_failed");
+        assertThat(invalid.code()).isEqualTo("VALIDATION_FAILED");
         assertThat((List<?>) invalid.body().get("errors")).hasSize(2);
 
         var badCurrency = api.post("/api/v1/accounts", Map.of("customerId", UUID.randomUUID(), "currency", "XYZ"));
@@ -56,17 +56,17 @@ class CustomerAccountApiTest extends IntegrationTest {
         newWallet(customer, "EUR");
         var duplicate = api.post("/api/v1/accounts", Map.of("customerId", customer, "currency", "EUR"));
         assertThat(duplicate.status()).isEqualTo(409);
-        assertThat(duplicate.code()).isEqualTo("account_already_exists");
+        assertThat(duplicate.code()).isEqualTo("ACCOUNT_ALREADY_EXISTS");
 
         var unsupported = api.post("/api/v1/accounts", Map.of("customerId", customer, "currency", "JPY"));
         assertThat(unsupported.status()).isEqualTo(422);
-        assertThat(unsupported.code()).isEqualTo("unsupported_currency");
+        assertThat(unsupported.code()).isEqualTo("UNSUPPORTED_CURRENCY");
     }
 
     @Test
     void unknownIdsReturn404AndMalformedIds400() {
         assertThat(api.get("/api/v1/accounts/" + UUID.randomUUID()).status()).isEqualTo(404);
-        assertThat(api.get("/api/v1/customers/" + UUID.randomUUID()).code()).isEqualTo("customer_not_found");
+        assertThat(api.get("/api/v1/customers/" + UUID.randomUUID()).code()).isEqualTo("CUSTOMER_NOT_FOUND");
         assertThat(api.get("/api/v1/accounts/42").status()).isEqualTo(400);
         var noCustomer = api.post("/api/v1/accounts", Map.of("customerId", UUID.randomUUID(), "currency", "EUR"));
         assertThat(noCustomer.status()).isEqualTo(404);
@@ -94,14 +94,14 @@ class CustomerAccountApiTest extends IntegrationTest {
         UUID wallet = newWallet("EUR");
         var tooPrecise = api.post("/api/v1/accounts/" + wallet + "/deposits", Map.of("amount", "1.001", "currency", "EUR"));
         assertThat(tooPrecise.status()).isEqualTo(400);
-        assertThat(tooPrecise.code()).isEqualTo("invalid_amount");
+        assertThat(tooPrecise.code()).isEqualTo("INVALID_AMOUNT");
 
         var negative = api.post("/api/v1/accounts/" + wallet + "/deposits", Map.of("amount", "-5", "currency", "EUR"));
         assertThat(negative.status()).isEqualTo(400);
 
         var wrongCurrency = api.post("/api/v1/accounts/" + wallet + "/deposits", Map.of("amount", "5", "currency", "USD"));
         assertThat(wrongCurrency.status()).isEqualTo(422);
-        assertThat(wrongCurrency.code()).isEqualTo("currency_mismatch");
+        assertThat(wrongCurrency.code()).isEqualTo("CURRENCY_MISMATCH");
     }
 
     @Test
@@ -109,12 +109,12 @@ class CustomerAccountApiTest extends IntegrationTest {
         UUID wallet = newFundedWallet("GBP", "5.00");
         assertThat(api.post("/api/v1/accounts/" + wallet + "/freeze", null).body()).containsEntry("status", "FROZEN");
         assertThat(api.post("/api/v1/accounts/" + wallet + "/deposits", Map.of("amount", "1", "currency", "GBP")).code())
-                .isEqualTo("account_not_active");
+                .isEqualTo("ACCOUNT_FROZEN");
         assertThat(api.post("/api/v1/accounts/" + wallet + "/unfreeze", null).body()).containsEntry("status", "ACTIVE");
 
         var close = api.post("/api/v1/accounts/" + wallet + "/close", null);
         assertThat(close.status()).isEqualTo(422);
-        assertThat(close.code()).isEqualTo("account_balance_not_zero");
+        assertThat(close.code()).isEqualTo("ACCOUNT_BALANCE_NOT_ZERO");
 
         UUID empty = newWallet("GBP");
         assertThat(api.post("/api/v1/accounts/" + empty + "/close", null).body()).containsEntry("status", "CLOSED");

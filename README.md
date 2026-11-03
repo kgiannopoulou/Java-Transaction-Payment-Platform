@@ -8,7 +8,7 @@ race-safe under heavy concurrency and idempotent under client retries, and those
 backed by tests that attack the running API with hundreds of simultaneous requests against a
 real PostgreSQL.
 
-[![CI](https://github.com/kgiannopoulou/ledgerforge/actions/workflows/ci.yml/badge.svg)](https://github.com/kgiannopoulou/ledgerforge/actions/workflows/ci.yml)
+[![CI](https://github.com/kgiannopoulou/Java-Transaction-Payment-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/kgiannopoulou/Java-Transaction-Payment-Platform/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-blue)
 ![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6db33f)
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-336791)
@@ -29,6 +29,7 @@ real PostgreSQL.
 | **Modern Java**: records, sealed interfaces + exhaustive pattern-matching `switch`, `BigDecimal` money, virtual threads, streams | [`Money`](src/main/java/com/kgiannopoulou/ledgerforge/shared/money/Money.java), [`PaymentCommand`](src/main/java/com/kgiannopoulou/ledgerforge/payment/domain/PaymentCommand.java), [`PaymentService`](src/main/java/com/kgiannopoulou/ledgerforge/payment/application/PaymentService.java) |
 | **Spring**: MVC, Bean Validation, Data JPA, transactions (propagation, isolation, programmatic retry), configuration properties, RFC 9457 problem details | [`docs/architecture.md`](docs/architecture.md) |
 | **Databases**: Flyway migrations, constraints, partial unique indexes, deferred constraint triggers, `SELECT … FOR UPDATE`, `ON CONFLICT`, `REPEATABLE READ` | [`db/migration`](src/main/resources/db/migration) |
+| **Error handling**: sealed `DomainException` hierarchy, named exceptions (`InsufficientFundsException`, `AccountFrozenException`, `PaymentAlreadyCapturedException`, …), one `@RestControllerAdvice`, consistent error body with `traceId`, no stack traces leaked | [`docs/error-handling.md`](docs/error-handling.md), [`ApiExceptionHandler`](src/main/java/com/kgiannopoulou/ledgerforge/shared/web/ApiExceptionHandler.java) |
 | **Architecture**: package-by-feature modular monolith, rules enforced by ArchUnit | [`ArchitectureTest`](src/test/java/com/kgiannopoulou/ledgerforge/architecture/ArchitectureTest.java), [ADRs](docs/decisions) |
 | **Operations**: Docker multi-stage layered image, Compose, health probes, structured JSON logs, GitHub Actions CI | [`docker/Dockerfile`](docker/Dockerfile), [`compose.yaml`](compose.yaml), [`ci.yml`](.github/workflows/ci.yml) |
 
@@ -171,22 +172,33 @@ curl -s localhost:8080/api/v1/admin/reconciliation              # {"consistent":
 | `GET`  | `/api/v1/admin/reconciliation` | raw-SQL invariant check |
 | `GET`  | `/actuator/health` · `/actuator/health/liveness` · `/actuator/health/readiness` | |
 
-Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details with a stable `code`:
+Every error, whether it comes from the domain, validation or the framework, has the same shape
+([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`):
 
 ```json
-{ "status": 422, "title": "Unprocessable Content",
-  "detail": "Account 3f0c… has insufficient funds", "code": "insufficient_funds" }
+{
+  "type": "INSUFFICIENT_FUNDS",
+  "title": "Insufficient funds",
+  "status": 422,
+  "detail": "Account 3f0c… has insufficient available funds",
+  "traceId": "9d1c2f0e5b8a4c7d9e6f1a2b3c4d5e6f"
+}
 ```
+
+`type` is stable and safe to branch on; `traceId` matches the `X-Trace-Id` response header and
+every server log line for that request. Unexpected failures return a generic `500 INTERNAL_ERROR`;
+stack traces are logged, never returned. Full catalogue: [`docs/error-handling.md`](docs/error-handling.md).
 
 ## Tests
 
-`./mvnw verify` runs **123 tests**, all against real PostgreSQL 17 via Testcontainers:
+`./mvnw verify` runs **132 tests**, all against real PostgreSQL 17 via Testcontainers:
 
 | Suite | What it proves |
 |-------|----------------|
 | `MoneyTest`, `AccountTest`, `LedgerTransactionTest`, `PaymentStateMachineTest` | value-object rules, balancing, the full payment transition table (every from→to pair) |
 | `CustomerAccountApiTest`, `TransferApiTest`, `PaymentApiTest` | REST behaviour, validation, status codes, rollback on failure |
 | `LedgerDatabaseGuaranteesTest` | raw SQL cannot create unbalanced, mismatched-currency, negative or edited ledger data |
+| `ErrorResponseApiTest`, `ApiExceptionHandlerTest` | one error shape for domain *and* framework errors, `traceId` header/body/propagation, named exception types, no leaked internals on 500 |
 | `IdempotencyApiTest` | replay, 409 on body mismatch, failure releases the key, scoping |
 | `PessimisticLockingConcurrencyTest` | conservation over 500 concurrent transfers, double-spend, deadlock-freedom, retry storm, concurrent captures, whole-ledger reconciliation |
 | `OptimisticLockingConcurrencyTest` | same guarantees via `@Version` + retries |
@@ -200,11 +212,11 @@ ledgerforge/
 ├── README.md
 ├── docs/
 │   ├── architecture.md · domain-model.md · concurrency.md · idempotency.md · ledger-invariants.md
-│   └── decisions/                 ADR 0001–0007
+│   └── decisions/                 ADR 0001–0008
 ├── src/main/java/com/kgiannopoulou/ledgerforge/
 │   ├── customer/ account/ ledger/ transfer/ payment/ idempotency/
 │   │     └── api/ application/ domain/ infrastructure/
-│   ├── shared/                    Money, errors, transactions, web
+│   ├── shared/                    Money, error hierarchy, transactions, web (error handler, trace ids)
 │   ├── security/ audit/           placeholders for later milestones
 │   └── infrastructure/            cross-cutting config
 ├── src/main/resources/db/migration/   Flyway V1–V6
@@ -226,8 +238,7 @@ ledgerforge/
 
 ## Roadmap
 
-- [x] **Phase 0**: goals, docs, ADRs
-- [x] **Phase 1**: Spring Boot 4 / Java 21 bootstrap, package-by-feature layout
+- [x] **Phase 1**: Spring Boot 4 / Java 21 bootstrap, package-by-feature layout, docs + ADRs
 - [x] **Phase 2**: `Money` value object
 - [x] **Phase 3**: customers, wallets, account lifecycle
 - [x] **Phase 4**: double-entry ledger with database-enforced invariants
@@ -236,6 +247,7 @@ ledgerforge/
 - [x] **Phase 7**: concurrency test suite on real PostgreSQL
 - [x] **Phase 8**: idempotency keys
 - [x] **Phase 9**: payment lifecycle state machine with sealed commands
+- [x] **Phase 10**: domain-specific exceptions, consistent error responses with `traceId`, no leaked stack traces
 - [ ] Transactional outbox → Kafka (webhooks, audit/risk, notifications)
 - [ ] Spring Security (API keys / JWT, ownership checks), Redis rate limiting
 - [ ] Micrometer metrics → Prometheus → Grafana, tracing

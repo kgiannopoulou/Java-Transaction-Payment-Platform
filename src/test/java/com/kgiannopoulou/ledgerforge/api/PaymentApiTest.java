@@ -52,7 +52,7 @@ class PaymentApiTest extends IntegrationTest {
 
         var captureBeforeAuth = command(payment, "capture");
         assertThat(captureBeforeAuth.status()).isEqualTo(409);
-        assertThat(captureBeforeAuth.code()).isEqualTo("invalid_payment_transition");
+        assertThat(captureBeforeAuth.code()).isEqualTo("INVALID_PAYMENT_STATE");
 
         command(payment, "authorize");
         command(payment, "capture");
@@ -80,7 +80,7 @@ class PaymentApiTest extends IntegrationTest {
         UUID payment = createPayment("200.01");
         var response = command(payment, "authorize");
         assertThat(response.status()).isEqualTo(422);
-        assertThat(response.code()).isEqualTo("insufficient_funds");
+        assertThat(response.code()).isEqualTo("INSUFFICIENT_FUNDS");
         assertThat(api.get("/api/v1/payments/" + payment).body()).containsEntry("status", "CREATED");
     }
 
@@ -93,7 +93,7 @@ class PaymentApiTest extends IntegrationTest {
 
         var tooMuch = refund(payment, "15.01");
         assertThat(tooMuch.status()).isEqualTo(422);
-        assertThat(tooMuch.code()).isEqualTo("refund_exceeds_captured");
+        assertThat(tooMuch.code()).isEqualTo("REFUND_EXCEEDS_CAPTURED");
     }
 
     @Test
@@ -101,11 +101,11 @@ class PaymentApiTest extends IntegrationTest {
         UUID usd = newWallet("USD");
         var mismatch = api.post("/api/v1/payments", Map.of("payerAccountId", payer, "merchantAccountId", usd,
                 "amount", "1.00", "currency", "EUR"));
-        assertThat(mismatch.code()).isEqualTo("currency_mismatch");
+        assertThat(mismatch.code()).isEqualTo("CURRENCY_MISMATCH");
 
         var self = api.post("/api/v1/payments", Map.of("payerAccountId", payer, "merchantAccountId", payer,
                 "amount", "1.00", "currency", "EUR"));
-        assertThat(self.code()).isEqualTo("same_account");
+        assertThat(self.code()).isEqualTo("SAME_ACCOUNT");
 
         assertThat(command(UUID.randomUUID(), "authorize").status()).isEqualTo(404);
     }

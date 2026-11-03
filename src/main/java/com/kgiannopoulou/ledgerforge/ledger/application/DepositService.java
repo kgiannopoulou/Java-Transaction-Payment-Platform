@@ -42,7 +42,7 @@ public class DepositService {
     @Transactional
     public DepositResult deposit(UUID accountId, Money amount) {
         if (!amount.isPositive()) {
-            throw new BusinessRuleViolationException("invalid_amount", "Deposit amount must be positive");
+            throw new BusinessRuleViolationException("INVALID_AMOUNT", "Deposit amount must be positive");
         }
         SupportedCurrencies.require(amount.currency());
         UUID fundingId = accountService.systemAccountId(AccountType.EXTERNAL_FUNDING, amount.currency());
@@ -50,7 +50,7 @@ public class DepositService {
         Account wallet = locked.get(accountId);
 
         if (wallet.getType() != AccountType.CUSTOMER_WALLET) {
-            throw new BusinessRuleViolationException("not_a_wallet", "Deposits are only allowed into customer wallets");
+            throw new BusinessRuleViolationException("NOT_A_WALLET", "Deposits are only allowed into customer wallets");
         }
         wallet.requireActive();
         if (!wallet.getCurrency().equals(amount.currency())) {

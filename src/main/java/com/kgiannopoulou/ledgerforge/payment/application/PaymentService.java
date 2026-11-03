@@ -158,7 +158,7 @@ public class PaymentService {
 
     private static void requireWallet(Account account) {
         if (account.getType() != AccountType.CUSTOMER_WALLET) {
-            throw new BusinessRuleViolationException("not_a_wallet", "Payments are only allowed between customer wallets");
+            throw new BusinessRuleViolationException("NOT_A_WALLET", "Payments are only allowed between customer wallets");
         }
         account.requireActive();
     }

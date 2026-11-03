@@ -26,7 +26,7 @@ public class CustomerService {
         // Fast, friendly check. The unique index on lower(email) is what actually guarantees
         // uniqueness under concurrency; a lost race surfaces as a 409 from the exception handler.
         if (customers.existsByEmail(Customer.normalizeEmail(email))) {
-            throw new ConflictException("email_already_registered", "A customer with this email already exists");
+            throw new ConflictException("EMAIL_ALREADY_REGISTERED", "A customer with this email already exists");
         }
         return customers.save(Customer.register(email, fullName, clock.instant()));
     }

@@ -41,7 +41,7 @@ class IdempotencyApiTest extends IntegrationTest {
         var reused = transfer(alice, bob, "99.00", "EUR", key);
 
         assertThat(reused.status()).isEqualTo(409);
-        assertThat(reused.code()).isEqualTo("idempotency_key_reused");
+        assertThat(reused.code()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
         assertThat(balanceOf(alice)).isEqualByComparingTo("90.00");
     }
 
@@ -51,7 +51,7 @@ class IdempotencyApiTest extends IntegrationTest {
         UUID bob = newWallet("EUR");
         String key = "transfer-" + UUID.randomUUID();
 
-        assertThat(transfer(alice, bob, "20.00", "EUR", key).code()).isEqualTo("insufficient_funds");
+        assertThat(transfer(alice, bob, "20.00", "EUR", key).code()).isEqualTo("INSUFFICIENT_FUNDS");
         deposit(alice, "10.00", "EUR");
         // Same key, same body: the earlier failure was rolled back together with the key, so it executes now.
         var retried = transfer(alice, bob, "20.00", "EUR", key);
@@ -91,6 +91,6 @@ class IdempotencyApiTest extends IntegrationTest {
         UUID bob = newWallet("EUR");
         var response = transfer(alice, bob, "1.00", "EUR", "k".repeat(256));
         assertThat(response.status()).isEqualTo(400);
-        assertThat(response.code()).isEqualTo("invalid_idempotency_key");
+        assertThat(response.code()).isEqualTo("INVALID_IDEMPOTENCY_KEY");
     }
 }

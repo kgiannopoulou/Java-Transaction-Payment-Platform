@@ -7,7 +7,12 @@ package com.kgiannopoulou.ledgerforge.shared.error;
  */
 public non-sealed class ConflictException extends DomainException {
 
-    public ConflictException(String code, String message) {
-        super(code, message);
+    public ConflictException(String type, String message) {
+        super(type, message);
+    }
+
+    @Override
+    public String title() {
+        return "Request conflicts with current state";
     }
 }

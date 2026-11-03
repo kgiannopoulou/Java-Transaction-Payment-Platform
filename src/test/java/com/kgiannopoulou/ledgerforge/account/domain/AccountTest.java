@@ -1,7 +1,6 @@
 package com.kgiannopoulou.ledgerforge.account.domain;
 
 import com.kgiannopoulou.ledgerforge.shared.error.BusinessRuleViolationException;
-import com.kgiannopoulou.ledgerforge.shared.error.ConflictException;
 import com.kgiannopoulou.ledgerforge.shared.money.CurrencyMismatchException;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
 import org.junit.jupiter.api.Test;
@@ -51,8 +50,8 @@ class AccountTest {
     void frozenAccountsCannotMoveMoney() {
         wallet.freeze();
         assertThatThrownBy(wallet::requireActive)
-                .isInstanceOf(BusinessRuleViolationException.class)
-                .hasMessageContaining("FROZEN");
+                .isInstanceOf(AccountFrozenException.class)
+                .hasMessageContaining("frozen");
         wallet.unfreeze();
         wallet.requireActive();
     }
@@ -64,7 +63,8 @@ class AccountTest {
         wallet.debit(eur("1"));
         wallet.close();
         assertThat(wallet.getStatus()).isEqualTo(AccountStatus.CLOSED);
-        assertThatThrownBy(wallet::unfreeze).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(wallet::unfreeze).isInstanceOf(AccountClosedException.class);
+        assertThatThrownBy(wallet::requireActive).isInstanceOf(AccountClosedException.class);
     }
 
     @Test

@@ -43,12 +43,18 @@ public final class ApiClient {
         }
 
         public String code() {
-            return string("code");
+            return string("type");
         }
     }
 
     public Response get(String path) {
         return send(HttpRequest.newBuilder(URI.create(baseUrl + path)).GET());
+    }
+
+    public Response get(String path, Map<String, String> headers) {
+        var builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).GET();
+        headers.forEach(builder::header);
+        return send(builder);
     }
 
     public Response post(String path, Object body) {

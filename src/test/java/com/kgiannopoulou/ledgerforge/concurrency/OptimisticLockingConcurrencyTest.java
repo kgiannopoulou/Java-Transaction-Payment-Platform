@@ -61,7 +61,7 @@ class OptimisticLockingConcurrencyTest extends IntegrationTest {
 
         assertThat(responses).filteredOn(r -> r.status() == 201).hasSize(1);
         assertThat(responses).filteredOn(r -> r.status() != 201)
-                .allSatisfy(r -> assertThat(r.code()).isIn("insufficient_funds", "concurrent_modification"));
+                .allSatisfy(r -> assertThat(r.code()).isIn("INSUFFICIENT_FUNDS", "CONCURRENT_MODIFICATION"));
         assertThat(balanceOf(alice)).isEqualByComparingTo("0.00");
     }
 }

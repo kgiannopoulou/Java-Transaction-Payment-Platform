@@ -6,7 +6,12 @@ package com.kgiannopoulou.ledgerforge.shared.error;
  */
 public non-sealed class BusinessRuleViolationException extends DomainException {
 
-    public BusinessRuleViolationException(String code, String message) {
-        super(code, message);
+    public BusinessRuleViolationException(String type, String message) {
+        super(type, message);
+    }
+
+    @Override
+    public String title() {
+        return "Request rejected";
     }
 }

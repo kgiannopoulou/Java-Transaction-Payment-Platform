@@ -43,10 +43,10 @@ public class AccountService {
         Customer customer = customers.findById(customerId)
                 .orElseThrow(() -> new NotFoundException("Customer", customerId));
         if (!customer.isActive()) {
-            throw new BusinessRuleViolationException("customer_not_active", "Customer " + customerId + " is not active");
+            throw new BusinessRuleViolationException("CUSTOMER_NOT_ACTIVE", "Customer " + customerId + " is not active");
         }
         if (accounts.existsByCustomerIdAndCurrency(customerId, currency)) {
-            throw new ConflictException("account_already_exists",
+            throw new ConflictException("ACCOUNT_ALREADY_EXISTS",
                     "Customer " + customerId + " already has a " + currency + " wallet");
         }
         return accounts.save(Account.openWallet(customerId, currency, clock.instant()));

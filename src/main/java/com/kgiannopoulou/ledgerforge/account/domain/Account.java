@@ -2,7 +2,6 @@ package com.kgiannopoulou.ledgerforge.account.domain;
 
 import com.kgiannopoulou.ledgerforge.shared.persistence.BaseEntity;
 import com.kgiannopoulou.ledgerforge.shared.error.BusinessRuleViolationException;
-import com.kgiannopoulou.ledgerforge.shared.error.ConflictException;
 import com.kgiannopoulou.ledgerforge.shared.money.CurrencyMismatchException;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
 import jakarta.persistence.Column;
@@ -106,16 +105,17 @@ public class Account extends BaseEntity {
     // ---- lifecycle ---------------------------------------------------------------------------
 
     public void requireActive() {
-        if (status != AccountStatus.ACTIVE) {
-            throw new BusinessRuleViolationException("account_not_active",
-                    "Account " + getId() + " is " + status + " and cannot move money");
+        switch (status) {
+            case ACTIVE -> { }
+            case FROZEN -> throw new AccountFrozenException(getId());
+            case CLOSED -> throw new AccountClosedException(getId());
         }
     }
 
     public void freeze() {
         requireWallet();
         if (status == AccountStatus.CLOSED) {
-            throw new ConflictException("account_closed", "Account " + getId() + " is closed");
+            throw new AccountClosedException(getId());
         }
         status = AccountStatus.FROZEN;
     }
@@ -123,7 +123,7 @@ public class Account extends BaseEntity {
     public void unfreeze() {
         requireWallet();
         if (status == AccountStatus.CLOSED) {
-            throw new ConflictException("account_closed", "Account " + getId() + " is closed");
+            throw new AccountClosedException(getId());
         }
         status = AccountStatus.ACTIVE;
     }
@@ -131,7 +131,7 @@ public class Account extends BaseEntity {
     public void close() {
         requireWallet();
         if (!getBalance().isZero()) {
-            throw new BusinessRuleViolationException("account_balance_not_zero",
+            throw new BusinessRuleViolationException("ACCOUNT_BALANCE_NOT_ZERO",
                     "Account " + getId() + " must have a zero balance before it can be closed");
         }
         status = AccountStatus.CLOSED;
@@ -139,7 +139,7 @@ public class Account extends BaseEntity {
 
     private void requireWallet() {
         if (type != AccountType.CUSTOMER_WALLET) {
-            throw new BusinessRuleViolationException("system_account", "System accounts cannot change status");
+            throw new BusinessRuleViolationException("SYSTEM_ACCOUNT", "System accounts cannot change status");
         }
     }
 

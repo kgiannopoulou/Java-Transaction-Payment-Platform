@@ -59,7 +59,7 @@ public class RetryingTransactionExecutor {
                 }
                 if (attempt >= properties.maxAttempts()) {
                     log.warn("Giving up after {} attempts due to concurrent modification: {}", attempt, e.toString());
-                    throw new ConflictException("concurrent_modification",
+                    throw new ConflictException("CONCURRENT_MODIFICATION",
                             "The resource was modified concurrently; please retry the request");
                 }
                 retries.increment();

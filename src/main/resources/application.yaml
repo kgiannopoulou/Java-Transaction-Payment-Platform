@@ -26,10 +26,26 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  web:
+    resources:
+      # Pure JSON API: no static content. Unknown routes then raise NoHandlerFoundException,
+      # which ApiExceptionHandler renders in the standard error shape.
+      add-mappings: false
 
 server:
   port: ${PORT:8080}
   shutdown: graceful
+  error:
+    # Belt and braces: ApiExceptionHandler already handles everything, but never let the
+    # container's fallback error page leak internals either.
+    include-stacktrace: never
+    include-exception: false
+    include-message: never
+
+logging:
+  pattern:
+    # Prefix every log line with the request's trace id (see TraceIdFilter).
+    correlation: "[%X{traceId:-}] "
 
 management:
   endpoints:

@@ -18,7 +18,7 @@ public final class SupportedCurrencies {
 
     public static void require(Currency currency) {
         if (!ALL.contains(currency)) {
-            throw new BusinessRuleViolationException("unsupported_currency",
+            throw new BusinessRuleViolationException("UNSUPPORTED_CURRENCY",
                     "Currency " + currency + " is not supported; supported: EUR, USD, GBP");
         }
     }

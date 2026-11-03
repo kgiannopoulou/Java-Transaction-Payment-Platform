@@ -3,7 +3,7 @@ package com.kgiannopoulou.ledgerforge.idempotency.application;
 import com.kgiannopoulou.ledgerforge.idempotency.domain.IdempotencyKey;
 import com.kgiannopoulou.ledgerforge.idempotency.domain.IdempotencyRecord;
 import com.kgiannopoulou.ledgerforge.idempotency.domain.IdempotencyRepository;
-import com.kgiannopoulou.ledgerforge.shared.error.ConflictException;
+import com.kgiannopoulou.ledgerforge.idempotency.domain.DuplicateIdempotencyKeyException;
 import com.kgiannopoulou.ledgerforge.shared.error.InvalidRequestException;
 import com.kgiannopoulou.ledgerforge.shared.transaction.RetryingTransactionExecutor;
 import org.slf4j.Logger;
@@ -87,8 +87,7 @@ public class IdempotentOperations {
             record.restart(fingerprint, now, expiresAt);
         }
         if (!record.matches(fingerprint)) {
-            throw new ConflictException("idempotency_key_reused",
-                    "Idempotency-Key '" + id.key() + "' was already used with a different request");
+            throw new DuplicateIdempotencyKeyException(id.key());
         }
         if (record.isCompleted()) {
             log.debug("Replaying stored response for idempotency key {}", id);
@@ -103,7 +102,7 @@ public class IdempotentOperations {
 
     private static void validateKey(String key) {
         if (key.isBlank() || key.length() > MAX_KEY_LENGTH) {
-            throw new InvalidRequestException("invalid_idempotency_key",
+            throw new InvalidRequestException("INVALID_IDEMPOTENCY_KEY",
                     "Idempotency-Key must be 1-" + MAX_KEY_LENGTH + " non-blank characters");
         }
     }
