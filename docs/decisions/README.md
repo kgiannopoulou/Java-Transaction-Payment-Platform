@@ -14,3 +14,7 @@ context, decision, consequences.
 | [0006](0006-jpa-entities-as-domain-model.md) | JPA-annotated entities as the domain model | Accepted |
 | [0007](0007-real-postgres-in-tests.md) | Real PostgreSQL (Testcontainers) in tests, no H2 | Accepted |
 | [0008](0008-sealed-domain-exceptions-and-one-error-shape.md) | Sealed domain exceptions and one error shape | Accepted |
+| [0009](0009-jwt-roles-and-ownership-checks.md) | Stateless JWT, non-hierarchical roles, ownership checks | Accepted |
+| [0010](0010-append-only-audit-in-the-business-transaction.md) | Append-only audit trail written in the business transaction | Accepted |
+| [0011](0011-transactional-outbox.md) | Transactional outbox for publishing events to Kafka | Accepted |
+| [0012](0012-idempotent-consumers-retries-and-dlt.md) | Idempotent consumers, retries with backoff, dead-letter topics | Accepted |

@@ -72,7 +72,7 @@ class ErrorResponseApiTest extends IntegrationTest {
         assertThat(badUuid.code()).isEqualTo("INVALID_PARAMETER");
         assertNoInternalsLeaked(badUuid);
 
-        var malformed = api.post("/api/v1/transfers", "{not json");
+        var malformed = asCustomer(newCustomer()).post("/api/v1/transfers", "{not json");
         assertThat(malformed.status()).isEqualTo(400);
         assertThat(malformed.code()).isEqualTo("MALFORMED_REQUEST");
         assertNoInternalsLeaked(malformed);
@@ -90,17 +90,15 @@ class ErrorResponseApiTest extends IntegrationTest {
 
         UUID payer = newFundedWallet("EUR", "50.00");
         UUID merchant = newWallet("EUR");
-        UUID payment = UUID.fromString(api.post("/api/v1/payments", Map.of(
-                "payerAccountId", payer, "merchantAccountId", merchant,
-                "amount", "10.00", "currency", "EUR")).string("id"));
-        api.post("/api/v1/payments/" + payment + "/authorize", null);
-        api.post("/api/v1/payments/" + payment + "/capture", null);
+        UUID payment = newPayment(payer, merchant, "10.00", "EUR");
+        asOwnerOf(payer).post("/api/v1/payments/" + payment + "/authorize", null);
+        asOwnerOf(merchant).post("/api/v1/payments/" + payment + "/capture", null);
 
-        var secondCapture = api.post("/api/v1/payments/" + payment + "/capture", null);
+        var secondCapture = asOwnerOf(merchant).post("/api/v1/payments/" + payment + "/capture", null);
         assertThat(secondCapture.status()).isEqualTo(409);
         assertThat(secondCapture.code()).isEqualTo("PAYMENT_ALREADY_CAPTURED");
 
-        var authorizeCaptured = api.post("/api/v1/payments/" + payment + "/authorize", null);
+        var authorizeCaptured = asOwnerOf(payer).post("/api/v1/payments/" + payment + "/authorize", null);
         assertThat(authorizeCaptured.status()).isEqualTo(409);
         assertThat(authorizeCaptured.code()).isEqualTo("INVALID_PAYMENT_STATE");
     }

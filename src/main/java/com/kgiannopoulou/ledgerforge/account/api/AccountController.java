@@ -1,5 +1,6 @@
 package com.kgiannopoulou.ledgerforge.account.api;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.kgiannopoulou.ledgerforge.account.application.AccountService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -23,17 +24,20 @@ class AccountController {
     }
 
     @PostMapping("/api/v1/accounts")
+    @PreAuthorize("@access.canOpenAccountFor(#request.customerId())")
     ResponseEntity<AccountResponse> open(@Valid @RequestBody CreateAccountRequest request) {
         var account = AccountResponse.from(accountService.openWallet(request.customerId(), request.currency()));
         return ResponseEntity.created(URI.create("/api/v1/accounts/" + account.id())).body(account);
     }
 
     @GetMapping("/api/v1/accounts/{id}")
+    @PreAuthorize("@access.canReadAccount(#id)")
     AccountResponse get(@PathVariable UUID id) {
         return AccountResponse.from(accountService.get(id));
     }
 
     @GetMapping("/api/v1/customers/{customerId}/accounts")
+    @PreAuthorize("@access.canReadCustomer(#customerId)")
     List<AccountResponse> listForCustomer(@PathVariable UUID customerId) {
         return accountService.listForCustomer(customerId).stream().map(AccountResponse::from).toList();
     }

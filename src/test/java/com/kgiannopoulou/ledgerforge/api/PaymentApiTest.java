@@ -99,15 +99,16 @@ class PaymentApiTest extends IntegrationTest {
     @Test
     void paymentValidation() {
         UUID usd = newWallet("USD");
-        var mismatch = api.post("/api/v1/payments", Map.of("payerAccountId", payer, "merchantAccountId", usd,
+        var mismatch = asOwnerOf(payer).post("/api/v1/payments", Map.of("payerAccountId", payer, "merchantAccountId", usd,
                 "amount", "1.00", "currency", "EUR"));
         assertThat(mismatch.code()).isEqualTo("CURRENCY_MISMATCH");
 
-        var self = api.post("/api/v1/payments", Map.of("payerAccountId", payer, "merchantAccountId", payer,
+        var self = asOwnerOf(payer).post("/api/v1/payments", Map.of("payerAccountId", payer, "merchantAccountId", payer,
                 "amount", "1.00", "currency", "EUR"));
         assertThat(self.code()).isEqualTo("SAME_ACCOUNT");
 
-        assertThat(command(UUID.randomUUID(), "authorize").status()).isEqualTo(404);
+        // A customer cannot even probe for payments that are not theirs: 403, not 404.
+        assertThat(command(UUID.randomUUID(), "authorize").status()).isEqualTo(403);
     }
 
     @Test
@@ -116,8 +117,8 @@ class PaymentApiTest extends IntegrationTest {
         command(payment, "authorize");
         String key = "capture-" + UUID.randomUUID();
 
-        var first = api.post("/api/v1/payments/" + payment + "/capture", null, key);
-        var retry = api.post("/api/v1/payments/" + payment + "/capture", null, key);
+        var first = asOwnerOf(merchant).post("/api/v1/payments/" + payment + "/capture", null, key);
+        var retry = asOwnerOf(merchant).post("/api/v1/payments/" + payment + "/capture", null, key);
 
         assertThat(first.status()).isEqualTo(200);
         assertThat(retry.status()).isEqualTo(200); // replayed, not "409 already captured"
@@ -126,7 +127,7 @@ class PaymentApiTest extends IntegrationTest {
     }
 
     private UUID createPayment(String amount) {
-        var response = api.post("/api/v1/payments", Map.of(
+        var response = asOwnerOf(payer).post("/api/v1/payments", Map.of(
                 "payerAccountId", payer,
                 "merchantAccountId", merchant,
                 "amount", amount,
@@ -137,11 +138,14 @@ class PaymentApiTest extends IntegrationTest {
         return UUID.fromString(response.string("id"));
     }
 
+    /** The payer authorizes and cancels; the merchant captures (and refunds). */
     private ApiClient.Response command(UUID payment, String action) {
-        return api.post("/api/v1/payments/" + payment + "/" + action, null);
+        UUID actor = action.equals("capture") ? merchant : payer;
+        return asOwnerOf(actor).post("/api/v1/payments/" + payment + "/" + action, null);
     }
 
     private ApiClient.Response refund(UUID payment, String amount) {
-        return api.post("/api/v1/payments/" + payment + "/refund", Map.of("amount", amount, "currency", "EUR"));
+        return asOwnerOf(merchant).post("/api/v1/payments/" + payment + "/refund",
+                Map.of("amount", amount, "currency", "EUR"));
     }
 }

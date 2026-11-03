@@ -1,5 +1,11 @@
 package com.kgiannopoulou.ledgerforge.account.application;
 
+import com.kgiannopoulou.ledgerforge.shared.event.AccountFrozenEvent;
+import com.kgiannopoulou.ledgerforge.shared.event.IntegrationEventPublisher;
+import java.util.Map;
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditedEntity;
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditAction;
+import com.kgiannopoulou.ledgerforge.audit.application.AuditTrail;
 import com.kgiannopoulou.ledgerforge.account.domain.Account;
 import com.kgiannopoulou.ledgerforge.account.domain.AccountRepository;
 import com.kgiannopoulou.ledgerforge.account.domain.AccountType;
@@ -26,14 +32,19 @@ public class AccountService {
     private final CustomerRepository customers;
     private final AccountLocks accountLocks;
     private final RetryingTransactionExecutor transactions;
+    private final AuditTrail audit;
+    private final IntegrationEventPublisher events;
     private final Clock clock;
 
     public AccountService(AccountRepository accounts, CustomerRepository customers, AccountLocks accountLocks,
-                          RetryingTransactionExecutor transactions, Clock clock) {
+                          RetryingTransactionExecutor transactions, AuditTrail audit,
+                          IntegrationEventPublisher events, Clock clock) {
         this.accounts = accounts;
         this.customers = customers;
         this.accountLocks = accountLocks;
         this.transactions = transactions;
+        this.audit = audit;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -49,7 +60,10 @@ public class AccountService {
             throw new ConflictException("ACCOUNT_ALREADY_EXISTS",
                     "Customer " + customerId + " already has a " + currency + " wallet");
         }
-        return accounts.save(Account.openWallet(customerId, currency, clock.instant()));
+        Account wallet = accounts.save(Account.openWallet(customerId, currency, clock.instant()));
+        audit.record(AuditAction.ACCOUNT_CREATED, AuditedEntity.ACCOUNT, wallet.getId(),
+                Map.of("customerId", customerId.toString(), "currency", currency.getCurrencyCode()));
+        return wallet;
     }
 
     @Transactional(readOnly = true)
@@ -70,23 +84,29 @@ public class AccountService {
     }
 
     public Account freeze(UUID id) {
-        return changeStatus(id, Account::freeze);
+        return changeStatus(id, Account::freeze, AuditAction.ACCOUNT_FROZEN, account ->
+                events.publish(new AccountFrozenEvent(UUID.randomUUID(), account.getId(), account.getCustomerId(),
+                        clock.instant())));
     }
 
     public Account unfreeze(UUID id) {
-        return changeStatus(id, Account::unfreeze);
+        return changeStatus(id, Account::unfreeze, AuditAction.ACCOUNT_UNFROZEN, account -> { });
     }
 
     public Account close(UUID id) {
-        return changeStatus(id, Account::close);
+        return changeStatus(id, Account::close, AuditAction.ACCOUNT_CLOSED, account -> { });
     }
 
     /** Status changes take the same row lock as money movements, so "close" cannot race a deposit. */
-    private Account changeStatus(UUID id, Consumer<Account> change) {
+    private Account changeStatus(UUID id, Consumer<Account> change, AuditAction action,
+                                 Consumer<Account> afterChange) {
         return transactions.execute(() -> {
             Account account = accountLocks.lockForBalanceChange(List.of(id)).get(id);
             change.accept(account);
-            return accounts.save(account);
+            Account saved = accounts.save(account);
+            audit.record(action, AuditedEntity.ACCOUNT, saved.getId(), Map.of("status", saved.getStatus().name()));
+            afterChange.accept(saved);
+            return saved;
         });
     }
 }

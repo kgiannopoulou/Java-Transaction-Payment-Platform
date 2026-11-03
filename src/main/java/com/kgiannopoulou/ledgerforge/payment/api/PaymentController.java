@@ -1,5 +1,6 @@
 package com.kgiannopoulou.ledgerforge.payment.api;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.kgiannopoulou.ledgerforge.idempotency.api.IdempotencyHeaders;
 import com.kgiannopoulou.ledgerforge.idempotency.application.IdempotentOperations;
 import com.kgiannopoulou.ledgerforge.payment.application.PaymentService;
@@ -36,6 +37,7 @@ class PaymentController {
     }
 
     @PostMapping
+    @PreAuthorize("@access.ownsAccount(#request.payerAccountId())")
     ResponseEntity<PaymentResponse> create(
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey,
             @Valid @RequestBody CreatePaymentRequest request) {
@@ -47,11 +49,13 @@ class PaymentController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@access.canReadPayment(#id)")
     PaymentResponse get(@PathVariable UUID id) {
         return PaymentResponse.from(paymentService.get(id));
     }
 
     @PostMapping("/{id}/authorize")
+    @PreAuthorize("@access.isPayer(#id)")
     ResponseEntity<PaymentResponse> authorize(
             @PathVariable UUID id,
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey) {
@@ -59,6 +63,7 @@ class PaymentController {
     }
 
     @PostMapping("/{id}/capture")
+    @PreAuthorize("@access.isMerchant(#id)")
     ResponseEntity<PaymentResponse> capture(
             @PathVariable UUID id,
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey) {
@@ -66,6 +71,7 @@ class PaymentController {
     }
 
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("@access.isPaymentParticipant(#id)")
     ResponseEntity<PaymentResponse> cancel(
             @PathVariable UUID id,
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey) {
@@ -73,6 +79,7 @@ class PaymentController {
     }
 
     @PostMapping("/{id}/refund")
+    @PreAuthorize("@access.isMerchant(#id)")
     ResponseEntity<PaymentResponse> refund(
             @PathVariable UUID id,
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey,

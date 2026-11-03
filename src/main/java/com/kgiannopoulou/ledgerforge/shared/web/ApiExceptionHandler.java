@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -73,6 +75,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("Data integrity violation: {}", e.getMostSpecificCause().getMessage());
         return respond(problem(HttpStatus.CONFLICT, "CONSTRAINT_VIOLATION", "Conflicting data",
                 "The request conflicts with existing data"));
+    }
+
+    /** Denied by {@code @PreAuthorize} ownership checks (method security runs inside MVC). */
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException e) {
+        return respond(problem(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Access denied",
+                "You are not allowed to perform this operation"));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException e) {
+        return respond(problem(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Authentication required",
+                "A valid bearer token is required"));
     }
 
     /** Last line of defence: log everything, reveal nothing. */

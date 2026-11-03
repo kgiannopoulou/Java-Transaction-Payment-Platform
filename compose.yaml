@@ -1,6 +1,9 @@
-# Local stack: PostgreSQL + LedgerForge.
-#   docker compose up --build        -> API on http://localhost:8080
-#   docker compose up -d postgres    -> database only, then ./mvnw spring-boot:run
+# Local stack: PostgreSQL + Kafka + LedgerForge.
+#   docker compose up --build              -> API on http://localhost:8080
+#   docker compose up -d postgres kafka    -> infrastructure only, then ./mvnw spring-boot:run
+#
+# Dev tokens are enabled here (POST /api/v1/auth/token) so the API can be explored without an
+# identity provider. Never enable them anywhere else.
 name: ledgerforge
 
 services:
@@ -20,6 +23,30 @@ services:
       timeout: 3s
       retries: 10
 
+  kafka:
+    image: apache/kafka:4.1.0   # KRaft, no ZooKeeper
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:9094,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topics are declared by the application
+    ports:
+      - "9094:9094"   # host clients (./mvnw spring-boot:run) use localhost:9094
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
   app:
     build:
       context: .
@@ -27,10 +54,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     environment:
       LEDGERFORGE_DB_URL: jdbc:postgresql://postgres:5432/ledgerforge
       LEDGERFORGE_DB_USER: ledgerforge
       LEDGERFORGE_DB_PASSWORD: ledgerforge
+      LEDGERFORGE_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LEDGERFORGE_DEV_TOKENS: "true"
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs   # one JSON object per log line
     ports:
       - "8080:8080"

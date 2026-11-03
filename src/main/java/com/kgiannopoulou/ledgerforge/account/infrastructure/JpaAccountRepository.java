@@ -26,6 +26,10 @@ interface JpaAccountRepository extends JpaRepository<Account, UUID>, AccountRepo
     Optional<UUID> findSystemAccountId(AccountType type, Currency currency);
 
     @Override
+    @Query("select a.customerId from Account a where a.id = :id")
+    Optional<UUID> findCustomerIdById(UUID id);
+
+    @Override
     @Modifying(flushAutomatically = true)
     @Query(value = "UPDATE accounts SET balance = :balance WHERE id = :id", nativeQuery = true)
     int overwriteBalanceUnsafe(UUID id, BigDecimal balance);

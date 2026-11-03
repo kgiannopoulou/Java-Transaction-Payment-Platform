@@ -138,13 +138,12 @@ class PessimisticLockingConcurrencyTest extends IntegrationTest {
     void concurrentCapturesOfOnePaymentSucceedExactlyOnce() {
         UUID payer = newFundedWallet("EUR", "100.00");
         UUID merchant = newWallet("EUR");
-        var created = api.post("/api/v1/payments", Map.of("payerAccountId", payer, "merchantAccountId", merchant,
-                "amount", "75.00", "currency", "EUR"));
-        String paymentId = created.string("id");
-        assertThat(api.post("/api/v1/payments/" + paymentId + "/authorize", null).status()).isEqualTo(200);
+        String paymentId = newPayment(payer, merchant, "75.00", "EUR").toString();
+        assertThat(asOwnerOf(payer).post("/api/v1/payments/" + paymentId + "/authorize", null).status()).isEqualTo(200);
 
+        var merchantClient = asOwnerOf(merchant);
         List<Integer> statuses = Concurrently.run(50,
-                i -> api.post("/api/v1/payments/" + paymentId + "/capture", null).status());
+                i -> merchantClient.post("/api/v1/payments/" + paymentId + "/capture", null).status());
 
         Map<Integer, Long> byStatus = statuses.stream().collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
         assertThat(byStatus).containsEntry(200, 1L).containsEntry(409, 49L);

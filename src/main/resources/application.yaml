@@ -31,6 +31,22 @@ spring:
       # Pure JSON API: no static content. Unknown routes then raise NoHandlerFoundException,
       # which ApiExceptionHandler renders in the standard error shape.
       add-mappings: false
+  kafka:
+    bootstrap-servers: ${LEDGERFORGE_KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      # The outbox relay marks an event published only after this acknowledgement.
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      # Commit each record's offset after the listener (and its DB transaction) succeeded.
+      ack-mode: record
 
 server:
   port: ${PORT:8080}
@@ -56,7 +72,9 @@ management:
     health:
       probes:
         enabled: true
-      show-details: always
+      # Health is public (probes); component details only for admins.
+      show-details: when-authorized
+      roles: ADMIN
 
 ledgerforge:
   concurrency:
@@ -73,3 +91,34 @@ ledgerforge:
   idempotency:
     ttl: 24h
     cleanup-interval: PT1H
+  security:
+    jwt:
+      issuer: ledgerforge
+      # Dev default only. Real deployments inject LEDGERFORGE_JWT_SECRET (>= 32 bytes) from a
+      # secret store, or validate tokens from an identity provider instead.
+      secret: ${LEDGERFORGE_JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+      ttl: 1h
+    dev-tokens:
+      # POST /api/v1/auth/token mints tokens for any role. Never enable outside local/demo.
+      enabled: ${LEDGERFORGE_DEV_TOKENS:false}
+  outbox:
+    relay:
+      enabled: true
+      poll-interval-ms: 500
+      batch-size: 100
+      initial-backoff: 1s
+      max-backoff: 5m
+      send-timeout: 10s
+      retention: 7d
+  kafka:
+    consumers:
+      enabled: true
+    retry:
+      initial-interval: 500ms
+      multiplier: 2
+      max-interval: 10s
+      max-retries: 4
+      partitions: 3
+      replication-factor: 1
+  risk:
+    large-amount-threshold: 10000.00

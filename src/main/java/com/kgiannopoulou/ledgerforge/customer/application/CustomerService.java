@@ -1,5 +1,9 @@
 package com.kgiannopoulou.ledgerforge.customer.application;
 
+import java.util.Map;
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditedEntity;
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditAction;
+import com.kgiannopoulou.ledgerforge.audit.application.AuditTrail;
 import com.kgiannopoulou.ledgerforge.customer.domain.Customer;
 import com.kgiannopoulou.ledgerforge.customer.domain.CustomerRepository;
 import com.kgiannopoulou.ledgerforge.shared.error.ConflictException;
@@ -14,10 +18,12 @@ import java.util.UUID;
 public class CustomerService {
 
     private final CustomerRepository customers;
+    private final AuditTrail audit;
     private final Clock clock;
 
-    public CustomerService(CustomerRepository customers, Clock clock) {
+    public CustomerService(CustomerRepository customers, AuditTrail audit, Clock clock) {
         this.customers = customers;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -28,7 +34,10 @@ public class CustomerService {
         if (customers.existsByEmail(Customer.normalizeEmail(email))) {
             throw new ConflictException("EMAIL_ALREADY_REGISTERED", "A customer with this email already exists");
         }
-        return customers.save(Customer.register(email, fullName, clock.instant()));
+        Customer customer = customers.save(Customer.register(email, fullName, clock.instant()));
+        // No PII in audit metadata: the customer record itself holds the email.
+        audit.record(AuditAction.CUSTOMER_REGISTERED, AuditedEntity.CUSTOMER, customer.getId(), Map.of());
+        return customer;
     }
 
     @Transactional(readOnly = true)

@@ -111,6 +111,6 @@ class TransferApiTest extends IntegrationTest {
         var precision = transfer(alice, bob, "0.001", "EUR");
         assertThat(precision.status()).isEqualTo(400);
         assertThat(precision.code()).isEqualTo("INVALID_AMOUNT");
-        assertThat(api.post("/api/v1/transfers", "not json").status()).isEqualTo(400);
+        assertThat(asOwnerOf(alice).post("/api/v1/transfers", "not json").status()).isEqualTo(400);
     }
 }

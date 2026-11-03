@@ -1,5 +1,6 @@
 package com.kgiannopoulou.ledgerforge.customer.api;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.kgiannopoulou.ledgerforge.customer.application.CustomerService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,7 @@ class CustomerController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@access.canReadCustomer(#id)")
     CustomerResponse get(@PathVariable UUID id) {
         return CustomerResponse.from(customerService.get(id));
     }

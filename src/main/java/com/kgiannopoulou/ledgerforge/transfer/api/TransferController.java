@@ -1,5 +1,6 @@
 package com.kgiannopoulou.ledgerforge.transfer.api;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.kgiannopoulou.ledgerforge.idempotency.api.IdempotencyHeaders;
 import com.kgiannopoulou.ledgerforge.idempotency.application.IdempotentOperations;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
@@ -36,6 +37,7 @@ class TransferController {
      * moving money twice.
      */
     @PostMapping
+    @PreAuthorize("@access.ownsAccount(#request.sourceAccountId())")
     ResponseEntity<TransferResponse> create(
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey,
             @Valid @RequestBody CreateTransferRequest request) {
@@ -47,6 +49,7 @@ class TransferController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@access.canReadTransfer(#id)")
     TransferResponse get(@PathVariable UUID id) {
         return TransferResponse.from(transferService.get(id));
     }

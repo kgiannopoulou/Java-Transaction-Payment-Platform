@@ -57,7 +57,8 @@ class ArchitectureTest {
             noClasses().that().resideInAPackage(ROOT + ".shared..")
                     .should().dependOnClassesThat().resideInAnyPackage(
                             ROOT + ".account..", ROOT + ".customer..", ROOT + ".ledger..", ROOT + ".payment..",
-                            ROOT + ".transfer..", ROOT + ".idempotency..");
+                            ROOT + ".transfer..", ROOT + ".idempotency..", ROOT + ".audit..", ROOT + ".outbox..",
+                            ROOT + ".messaging..", ROOT + ".risk..", ROOT + ".webhook..", ROOT + ".security..");
 
     @ArchTest
     static final ArchRule controllers_live_in_api_packages =

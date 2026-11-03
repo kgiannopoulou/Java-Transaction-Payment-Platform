@@ -55,6 +55,8 @@ classes live in `shared.error`.
 | 400 | `INVALID_PARAMETER` | Path/query parameter of the wrong type (e.g. not a UUID). |
 | 400 | `INVALID_AMOUNT` | More decimal places than the currency allows. |
 | 400 | `INVALID_IDEMPOTENCY_KEY` | Blank or longer than 255 characters. |
+| 401 | `UNAUTHENTICATED` | Missing, invalid, expired or foreign token. The reason is not disclosed. |
+| 403 | `ACCESS_DENIED` | Role not allowed, or the resource is not yours (also for ids that do not exist; see [security.md](security.md)). |
 | 404 | `CUSTOMER_NOT_FOUND`, `ACCOUNT_NOT_FOUND`, `TRANSFER_NOT_FOUND`, `PAYMENT_NOT_FOUND`, `LEDGER_TRANSACTION_NOT_FOUND` | Unknown id. |
 | 404 | `NOT_FOUND` | Unknown route. |
 | 405 / 415 | `METHOD_NOT_ALLOWED` / `UNSUPPORTED_MEDIA_TYPE` | Framework errors, same shape. |

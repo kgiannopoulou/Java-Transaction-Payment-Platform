@@ -1,5 +1,6 @@
 package com.kgiannopoulou.ledgerforge.ledger.api;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.kgiannopoulou.ledgerforge.account.application.AccountService;
 import com.kgiannopoulou.ledgerforge.idempotency.application.IdempotentOperations;
 import com.kgiannopoulou.ledgerforge.ledger.application.DepositService;
@@ -60,6 +61,7 @@ class LedgerController {
     }
 
     @GetMapping("/api/v1/accounts/{accountId}/transactions")
+    @PreAuthorize("@access.canReadAccount(#accountId)")
     @Transactional(readOnly = true)
     PageResponse<AccountEntryResponse> accountTransactions(
             @PathVariable UUID accountId,
@@ -75,7 +77,7 @@ class LedgerController {
         return LedgerTransactionResponse.from(ledgerService.get(id));
     }
 
-    /** Operator endpoint; will move behind admin authentication when security is added. */
+    /** Operator endpoint (AUDITOR, ADMIN; enforced in the security config). */
     @GetMapping("/api/v1/admin/reconciliation")
     LedgerReconciliationService.Report reconcile() {
         return reconciliation.reconcile();

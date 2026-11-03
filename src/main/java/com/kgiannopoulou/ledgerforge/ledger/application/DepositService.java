@@ -1,5 +1,8 @@
 package com.kgiannopoulou.ledgerforge.ledger.application;
 
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditedEntity;
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditAction;
+import com.kgiannopoulou.ledgerforge.audit.application.AuditTrail;
 import com.kgiannopoulou.ledgerforge.account.application.AccountLocks;
 import com.kgiannopoulou.ledgerforge.account.application.AccountService;
 import com.kgiannopoulou.ledgerforge.account.domain.Account;
@@ -29,11 +32,14 @@ public class DepositService {
     private final AccountService accountService;
     private final AccountLocks accountLocks;
     private final LedgerService ledgerService;
+    private final AuditTrail audit;
 
-    public DepositService(AccountService accountService, AccountLocks accountLocks, LedgerService ledgerService) {
+    public DepositService(AccountService accountService, AccountLocks accountLocks, LedgerService ledgerService,
+                          AuditTrail audit) {
         this.accountService = accountService;
         this.accountLocks = accountLocks;
         this.ledgerService = ledgerService;
+        this.audit = audit;
     }
 
     public record DepositResult(LedgerTransaction transaction, Account account) {
@@ -62,6 +68,10 @@ public class DepositService {
                 LedgerTransactionType.DEPOSIT,
                 List.of(Posting.debit(fundingId, amount), Posting.credit(wallet.getId(), amount)),
                 locked);
+        audit.record(AuditAction.DEPOSIT_RECORDED, AuditedEntity.ACCOUNT, wallet.getId(), Map.of(
+                "amount", amount.amount().toPlainString(),
+                "currency", amount.currency().getCurrencyCode(),
+                "ledgerTransactionId", transaction.getId().toString()));
         return new DepositResult(transaction, wallet);
     }
 }

@@ -1,5 +1,11 @@
 package com.kgiannopoulou.ledgerforge.payment.application;
 
+import com.kgiannopoulou.ledgerforge.shared.event.PaymentRefundedEvent;
+import com.kgiannopoulou.ledgerforge.shared.event.PaymentCapturedEvent;
+import com.kgiannopoulou.ledgerforge.shared.event.IntegrationEventPublisher;
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditedEntity;
+import com.kgiannopoulou.ledgerforge.audit.domain.AuditAction;
+import com.kgiannopoulou.ledgerforge.audit.application.AuditTrail;
 import com.kgiannopoulou.ledgerforge.account.application.AccountLocks;
 import com.kgiannopoulou.ledgerforge.account.application.AccountService;
 import com.kgiannopoulou.ledgerforge.account.domain.Account;
@@ -47,14 +53,19 @@ public class PaymentService {
     private final AccountService accountService;
     private final AccountLocks accountLocks;
     private final LedgerService ledgerService;
+    private final AuditTrail audit;
+    private final IntegrationEventPublisher events;
     private final Clock clock;
 
     public PaymentService(PaymentRepository payments, AccountService accountService, AccountLocks accountLocks,
-                          LedgerService ledgerService, Clock clock) {
+                          LedgerService ledgerService, AuditTrail audit, IntegrationEventPublisher events,
+                          Clock clock) {
         this.payments = payments;
         this.accountService = accountService;
         this.accountLocks = accountLocks;
         this.ledgerService = ledgerService;
+        this.audit = audit;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -74,7 +85,13 @@ public class PaymentService {
                 throw new CurrencyMismatchException(account.getCurrency(), command.amount().currency());
             }
         }
-        return payments.save(payment);
+        Payment saved = payments.save(payment);
+        audit.record(AuditAction.PAYMENT_CREATED, AuditedEntity.PAYMENT, saved.getId(), Map.of(
+                "payerAccountId", saved.getPayerAccountId().toString(),
+                "merchantAccountId", saved.getMerchantAccountId().toString(),
+                "amount", saved.getAmount().amount().toPlainString(),
+                "currency", saved.getCurrency().getCurrencyCode()));
+        return saved;
     }
 
     @Transactional
@@ -110,6 +127,7 @@ public class PaymentService {
                 List.of(Posting.debit(payer.getId(), payment.getAmount()), Posting.credit(holds, payment.getAmount())),
                 locked);
         payment.markAuthorized(clock.instant());
+        auditPayment(payment, AuditAction.PAYMENT_AUTHORIZED, payment.getAmount());
     }
 
     private void capture(Payment payment) {
@@ -122,6 +140,9 @@ public class PaymentService {
                         Posting.credit(payment.getMerchantAccountId(), payment.getAmount())),
                 locked);
         payment.markCaptured(clock.instant());
+        auditPayment(payment, AuditAction.PAYMENT_CAPTURED, payment.getAmount());
+        events.publish(new PaymentCapturedEvent(UUID.randomUUID(), payment.getId(), payment.getPayerAccountId(),
+                payment.getMerchantAccountId(), payment.getAmount().amount(), payment.getCurrency(), clock.instant()));
     }
 
     private void cancel(Payment payment) {
@@ -136,6 +157,7 @@ public class PaymentService {
                     locked);
         }
         payment.markCancelled(clock.instant());
+        auditPayment(payment, AuditAction.PAYMENT_CANCELLED, payment.getAmount());
     }
 
     private void refund(Payment payment, Money amount) {
@@ -150,6 +172,17 @@ public class PaymentService {
                 List.of(Posting.debit(merchant.getId(), amount), Posting.credit(payment.getPayerAccountId(), amount)),
                 locked);
         payment.recordRefund(amount, clock.instant());
+        auditPayment(payment, AuditAction.PAYMENT_REFUNDED, amount);
+        events.publish(new PaymentRefundedEvent(UUID.randomUUID(), payment.getId(), payment.getPayerAccountId(),
+                payment.getMerchantAccountId(), amount.amount(), amount.currency(),
+                payment.getStatus() == PaymentStatus.REFUNDED, clock.instant()));
+    }
+
+    private void auditPayment(Payment payment, AuditAction action, Money amount) {
+        audit.record(action, AuditedEntity.PAYMENT, payment.getId(), Map.of(
+                "status", payment.getStatus().name(),
+                "amount", amount.amount().toPlainString(),
+                "currency", amount.currency().getCurrencyCode()));
     }
 
     private UUID holdsAccountId(Payment payment) {

@@ -17,15 +17,31 @@ import java.util.Optional;
  */
 public final class ApiClient {
 
-    private final HttpClient http = HttpClient.newBuilder()
+    private static final HttpClient HTTP = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(5))
             .build();
     private final JsonMapper json = JsonMapper.builder().build();
     private final String baseUrl;
+    private final String bearerToken;
 
+    /** Anonymous client: no Authorization header. */
     public ApiClient(int port) {
-        this.baseUrl = "http://localhost:" + port;
+        this("http://localhost:" + port, null);
+    }
+
+    private ApiClient(String baseUrl, String bearerToken) {
+        this.baseUrl = baseUrl;
+        this.bearerToken = bearerToken;
+    }
+
+    /** Same server, authenticated with the given JWT. Clients are immutable and thread-safe. */
+    public ApiClient withToken(String token) {
+        return new ApiClient(baseUrl, token);
+    }
+
+    public ApiClient anonymous() {
+        return new ApiClient(baseUrl, null);
     }
 
     public record Response(int status, Map<String, Object> body, Map<String, java.util.List<String>> headers) {
@@ -76,7 +92,10 @@ public final class ApiClient {
     @SuppressWarnings("unchecked")
     private Response send(HttpRequest.Builder builder) {
         try {
-            HttpResponse<String> response = http.send(builder.timeout(Duration.ofSeconds(60)).build(),
+            if (bearerToken != null) {
+                builder.header("Authorization", "Bearer " + bearerToken);
+            }
+            HttpResponse<String> response = HTTP.send(builder.timeout(Duration.ofSeconds(60)).build(),
                     HttpResponse.BodyHandlers.ofString());
             String raw = response.body() == null ? "" : response.body().strip();
             Map<String, Object> body = raw.isEmpty() ? Map.of()

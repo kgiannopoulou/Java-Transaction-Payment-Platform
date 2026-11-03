@@ -22,6 +22,9 @@ public interface AccountRepository {
      */
     Optional<UUID> findSystemAccountId(AccountType type, Currency currency);
 
+    /** Owner of a wallet; empty for system accounts and unknown ids. Used by authorization checks. */
+    Optional<UUID> findCustomerIdById(UUID id);
+
     List<Account> findByCustomerIdOrderByCreatedAt(UUID customerId);
 
     boolean existsByCustomerIdAndCurrency(UUID customerId, Currency currency);
