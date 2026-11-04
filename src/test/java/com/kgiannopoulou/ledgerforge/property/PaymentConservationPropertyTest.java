@@ -3,6 +3,7 @@ package com.kgiannopoulou.ledgerforge.property;
 import com.kgiannopoulou.ledgerforge.support.ApiClient;
 import com.kgiannopoulou.ledgerforge.support.Concurrently;
 import com.kgiannopoulou.ledgerforge.support.IntegrationTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * The rate limit and velocity rule are lifted here: this test is about money, not abuse controls.
  */
+@Tag("concurrency")
 @TestPropertySource(properties = {
         "ledgerforge.rate-limit.payments.limit=1000000",
         "ledgerforge.risk.rules.velocity.max-attempts=1000000",

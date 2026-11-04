@@ -3,6 +3,7 @@ package com.kgiannopoulou.ledgerforge.concurrency;
 import com.kgiannopoulou.ledgerforge.support.ApiClient;
 import com.kgiannopoulou.ledgerforge.support.Concurrently;
 import com.kgiannopoulou.ledgerforge.support.IntegrationTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Concurrency tests against the production configuration (PESSIMISTIC locking).
  * Each request goes through real HTTP, Tomcat on virtual threads, Hikari and PostgreSQL.
  */
+@Tag("concurrency")
 class PessimisticLockingConcurrencyTest extends IntegrationTest {
 
     @Test

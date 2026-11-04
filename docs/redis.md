@@ -31,7 +31,7 @@ disagree with the ledger, and a balance check against a stale value is a double 
 read comes from PostgreSQL, under a row lock when money is about to move.
 
 The same goes for idempotency keys, which have to commit atomically with the payment they protect
-([ADR 0005](decisions/0005-idempotency-in-the-business-transaction.md)).
+([ADR 009](decisions/009-idempotency-in-the-business-transaction.md)).
 
 These rules are enforced, not just written down:
 

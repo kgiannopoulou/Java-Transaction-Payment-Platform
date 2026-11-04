@@ -182,7 +182,7 @@ LEDGERFORGE_DEV_TOKENS=true ./mvnw spring-boot:run
 ./mvnw test -DexcludedGroups=integration
 ```
 
-> The migrations were reorganised once, before any deployment ([ADR 0013](docs/decisions/0013-migration-layout-and-rebaseline.md)).
+> The migrations were reorganised once, before any deployment ([ADR 015](docs/decisions/015-migration-layout-and-rebaseline.md)).
 > If you have a local database from an earlier version, recreate it: `docker compose down -v`.
 
 ## API walkthrough
@@ -369,7 +369,7 @@ ledgerforge/
 │   ├── architecture.md · domain-model.md · concurrency.md · idempotency.md · ledger-invariants.md
 │   ├── error-handling.md · security.md · audit-trail.md · outbox.md · database-design.md
 │   ├── webhooks.md · redis.md · risk-engine.md · testing.md · observability.md · logging.md
-│   └── decisions/                 ADR 0001–0017
+│   └── decisions/                 ADR 008–0017
 ├── src/main/java/com/kgiannopoulou/ledgerforge/
 │   ├── customer/ account/ ledger/ transfer/ payment/ idempotency/
 │   │     └── api/ application/ domain/ infrastructure/

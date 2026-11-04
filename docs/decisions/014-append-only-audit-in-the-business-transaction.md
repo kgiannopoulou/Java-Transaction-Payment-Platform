@@ -1,4 +1,4 @@
-# ADR 0010: Append-only audit trail written in the business transaction
+# ADR 014: Append-only audit trail written in the business transaction
 
 **Status:** Accepted · 2026-11-03
 

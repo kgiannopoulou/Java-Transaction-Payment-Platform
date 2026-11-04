@@ -31,7 +31,7 @@ Rules:
   every test run starts from an empty PostgreSQL and applies every migration.
 
 The numbering was re-baselined once, before the first deployment. See
-[ADR 0013](decisions/0013-migration-layout-and-rebaseline.md).
+[ADR 015](decisions/015-migration-layout-and-rebaseline.md).
 
 ## Defence in depth
 

@@ -1,4 +1,4 @@
-# ADR 0005: Idempotency keys stored in the business transaction
+# ADR 009: Idempotency keys stored in the business transaction
 
 **Status:** Accepted · 2026-11-02
 

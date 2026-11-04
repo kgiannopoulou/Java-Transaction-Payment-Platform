@@ -1,6 +1,8 @@
 target/
 .git/
+.github/
 .jqwik-database
 docs/
-docker/grafana/
-docker/prometheus/
+monitoring/
+performance/
+failure-testing/

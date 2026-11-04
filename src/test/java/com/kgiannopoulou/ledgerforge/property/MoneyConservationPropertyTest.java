@@ -2,6 +2,7 @@ package com.kgiannopoulou.ledgerforge.property;
 
 import com.kgiannopoulou.ledgerforge.support.Concurrently;
 import com.kgiannopoulou.ledgerforge.support.IntegrationTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * One fixed seed keeps the build deterministic, and one fresh seed explores new traffic on every
  * run. A failure names its seed; replay it with {@code -Dproperty.seed=<seed>}.
  */
+@Tag("concurrency")
 class MoneyConservationPropertyTest extends IntegrationTest {
 
     private static final BigDecimal TOTAL = new BigDecimal("4000.00");

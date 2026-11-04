@@ -12,13 +12,17 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MVN: ./mvnw -B -ntp
+
 jobs:
   build:
-    name: Build & test (unit, integration, concurrency, architecture)
+    name: Build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
@@ -26,13 +30,45 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Compile
+        run: $MVN test-compile
+
+      - name: Code style (Checkstyle)
+        run: $MVN checkstyle:check
+
+      # Each tier fails on its own, so a red build says at once what kind of problem it is.
+      - name: Unit tests
+        run: $MVN test -DexcludedGroups=integration
+
       # Testcontainers uses the Docker engine that ships with GitHub-hosted Ubuntu runners.
-      - name: Verify
-        run: ./mvnw -B -ntp verify
+      - name: Integration tests
+        run: $MVN test -Dgroups=integration -DexcludedGroups=concurrency,e2e
+
+      - name: Concurrency tests
+        run: $MVN test -Dgroups=concurrency
+
+      - name: End-to-end tests
+        run: $MVN test -Dgroups=e2e
+
+      - name: Package
+        run: $MVN package -DskipTests
+
+      - name: Coverage report (JaCoCo)
+        if: always()
+        run: |
+          $MVN jacoco:report || exit 0
+          python3 .github/scripts/coverage_summary.py target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
 
       - name: Race-condition report
         if: always()
         run: grep -h "\[race-report\]" target/surefire-reports/*-output.txt || true
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/site/jacoco
 
       - name: Upload test reports
         if: failure()
@@ -48,4 +84,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image
-        run: docker build -f docker/Dockerfile -t ledgerforge:ci .
+        run: docker build -t ledgerforge:ci .
+
+  dependencies:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Software bill of materials
+        run: $MVN cyclonedx:makeAggregateBom
+
+      - name: Scan with OSV-Scanner
+        run: |
+          docker run --rm -v "$PWD/target:/scan:ro" ghcr.io/google/osv-scanner:v2.7.0 \
+            scan source -L /scan/bom.json
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: target/bom.json

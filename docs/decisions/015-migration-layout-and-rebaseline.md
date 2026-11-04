@@ -1,4 +1,4 @@
-# ADR 0013: Migration layout, and a one-time re-baseline
+# ADR 015: Migration layout, and a one-time re-baseline
 
 **Status:** Accepted · 2026-11-04
 

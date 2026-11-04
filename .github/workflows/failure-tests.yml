@@ -1,0 +1,35 @@
+name: Failure tests
+
+# Deliberately breaks the running stack and checks what it promises. See docs/failure-scenarios.md.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 5 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  experiments:
+    name: Kill things, verify nothing was lost
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: docker compose -f compose.yaml -f failure-testing/compose.failure.yaml up -d --build --wait --wait-timeout 300
+
+      - name: Run the experiments
+        run: python3 failure-testing/run.py
+
+      - name: Application logs on failure
+        if: failure()
+        run: docker compose -f compose.yaml -f failure-testing/compose.failure.yaml logs app --tail 200
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-test-results
+          path: failure-testing/results

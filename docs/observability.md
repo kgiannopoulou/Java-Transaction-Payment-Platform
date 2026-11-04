@@ -22,7 +22,7 @@ docker compose --profile demo up     # the platform, with generated traffic
 | Pending outbox events | `outbox_pending_events` | are events reaching Kafka? |
 | Webhook failures | `rate(webhook_failures_total[1m])` | are customers' endpoints reachable? |
 
-The dashboard and data source are provisioned from `docker/grafana/`, so nothing is set up by hand.
+The dashboard and data source are provisioned from `monitoring/grafana/`, so nothing is set up by hand.
 
 ## Metrics
 
@@ -61,7 +61,7 @@ This came up when checking the running stack: the webhook panel was empty.
 
 **`payments_created_total` is renamed in Prometheus.** The Prometheus client reserves the `_created`
 suffix for OpenMetrics timestamps and strips it, so `/actuator/prometheus` shows `payments_total`.
-A `metric_relabel_configs` rule in `docker/prometheus/prometheus.yml` stores it under the intended
+A `metric_relabel_configs` rule in `monitoring/prometheus/prometheus.yml` stores it under the intended
 name, which is what dashboards and alerts use.
 
 ## Access
@@ -83,7 +83,7 @@ The password in `compose.yaml` and `prometheus.yml` is a local demo value.
 
 ## Alerts
 
-Prometheus evaluates the rules in `docker/prometheus/alerts.yml`: `LedgerForgeDown`,
+Prometheus evaluates the rules in `monitoring/prometheus/alerts.yml`: `LedgerForgeDown`,
 `OutboxBacklogGrowing`, `PaymentFailureRateHigh` and `WebhookFailuresHigh`. They are visible under
 *Alerts* in Prometheus. There is no Alertmanager in the demo stack, so they do not notify anyone.
 

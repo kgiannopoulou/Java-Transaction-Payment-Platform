@@ -1,4 +1,4 @@
-# ADR 0007: Real PostgreSQL (Testcontainers) in tests, no H2
+# ADR 011: Real PostgreSQL (Testcontainers) in tests, no H2
 
 **Status:** Accepted · 2026-11-02
 

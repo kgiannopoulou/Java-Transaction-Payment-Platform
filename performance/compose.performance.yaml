@@ -1,0 +1,12 @@
+# Overrides for load testing, on top of compose.yaml:
+#
+#   docker compose -f compose.yaml -f performance/compose.performance.yaml up -d --build --wait
+#
+# Abuse controls are raised because they would (correctly) refuse a load test. Everything else, the
+# locks, ledger, audit trail, outbox, Kafka and risk screening, stays exactly as in normal use.
+services:
+  app:
+    environment:
+      LEDGERFORGE_RATELIMIT_PAYMENTS_LIMIT: "100000000"
+      LEDGERFORGE_RISK_RULES_VELOCITY_MAXATTEMPTS: "100000000"
+      LEDGERFORGE_RISK_RULES_REPEATEDFAILURE_MAXFAILURES: "100000000"

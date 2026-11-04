@@ -57,6 +57,16 @@ spring:
       # Commit each record's offset after the listener (and its DB transaction) succeeded.
       ack-mode: record
 
+springdoc:
+  # Interactive docs are off by default, like dev tokens; Compose turns them on for local use.
+  api-docs:
+    enabled: ${LEDGERFORGE_API_DOCS:false}
+  swagger-ui:
+    enabled: ${LEDGERFORGE_API_DOCS:false}
+    persist-authorization: true   # keeps the token across page reloads
+    tags-sorter: alpha
+    operations-sorter: method
+
 server:
   port: ${PORT:8080}
   shutdown: graceful

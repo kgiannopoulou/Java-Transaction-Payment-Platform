@@ -65,7 +65,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,7 +82,8 @@ services:
       LEDGERFORGE_REDIS_PORT: 6379
       LEDGERFORGE_DEV_TOKENS: "true"
       LEDGERFORGE_WEBHOOKS_ALLOW_INSECURE_URLS: "true"   # receivers on the local network
-      LEDGERFORGE_METRICS_PASSWORD: dev-only-metrics-password   # matches docker/prometheus/prometheus.yml
+      LEDGERFORGE_API_DOCS: "true"   # Swagger UI on http://localhost:8080/swagger-ui.html
+      LEDGERFORGE_METRICS_PASSWORD: dev-only-metrics-password   # matches monitoring/prometheus/prometheus.yml
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs   # one JSON object per log line
     ports:
       - "${LEDGERFORGE_HTTP_PORT:-8080}:8080"
@@ -96,8 +97,8 @@ services:
       app:
         condition: service_healthy
     volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "${LEDGERFORGE_PROMETHEUS_PORT:-9091}:9090"   # 9091 on the host to avoid clashing with a local Prometheus
@@ -120,8 +121,8 @@ services:
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     volumes:
-      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "${LEDGERFORGE_GRAFANA_PORT:-3002}:3000"   # 3002 on the host to avoid clashing with local dev servers
 
@@ -134,7 +135,7 @@ services:
       app:
         condition: service_healthy
     volumes:
-      - ./docker/demo/traffic.sh:/traffic.sh:ro
+      - ./monitoring/demo-traffic.sh:/traffic.sh:ro
     command: ["sh", "/traffic.sh"]
 
 volumes:

@@ -27,7 +27,7 @@ retries. That cannot work for real endpoints:
 
 So the consumer now only does fast local work, writing one `PENDING` row per subscribed endpoint.
 From then on, delivery has its own state machine in PostgreSQL. See
-[ADR 0014](decisions/0014-webhook-delivery-state-machine.md).
+[ADR 016](decisions/016-webhook-delivery-state-machine.md).
 
 ## API
 

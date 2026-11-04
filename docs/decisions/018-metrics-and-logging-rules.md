@@ -1,4 +1,4 @@
-# ADR 0017: Metrics and logging rules
+# ADR 018: Metrics and logging rules
 
 **Status:** Accepted · 2026-11-04
 

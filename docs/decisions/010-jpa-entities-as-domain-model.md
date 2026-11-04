@@ -1,4 +1,4 @@
-# ADR 0006: JPA-annotated entities as the domain model
+# ADR 010: JPA-annotated entities as the domain model
 
 **Status:** Accepted · 2026-11-02
 

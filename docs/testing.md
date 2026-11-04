@@ -22,7 +22,8 @@ important ones state invariants directly.
 ```bash
 ./mvnw verify                                  # everything
 ./mvnw test -DexcludedGroups=integration       # unit tier only: seconds, no Docker
-./mvnw test -DexcludedGroups=e2e -Dgroups=integration   # integration without Kafka
+./mvnw test -Dgroups=integration -DexcludedGroups=concurrency,e2e
+./mvnw test -Dgroups=concurrency               # races, locks, random concurrent traffic
 ./mvnw test -Dgroups=e2e                       # the full pipeline
 ```
 
@@ -34,7 +35,7 @@ lands in the right tier automatically.
 | Tool | Used for | Why |
 |------|----------|-----|
 | **JUnit 5 API** (on JUnit 6) | everything | |
-| **Testcontainers** | PostgreSQL, Kafka, Redis | the guarantees under test (row locks, deferred triggers, `SKIP LOCKED`, Lua scripts, consumer groups) are behaviour of those products, so a fake would prove nothing ([ADR 0007](decisions/0007-real-postgres-in-tests.md)) |
+| **Testcontainers** | PostgreSQL, Kafka, Redis | the guarantees under test (row locks, deferred triggers, `SKIP LOCKED`, Lua scripts, consumer groups) are behaviour of those products, so a fake would prove nothing ([ADR 011](decisions/011-real-postgres-in-tests.md)) |
 | **Mockito** | `EphemeralStoreFallbacksTest` | only where a mock does what a real system cannot, such as a Redis read working and the following write failing |
 | **jqwik** | `DomainPropertyTest` | generates inputs and shrinks a failure to a minimal example |
 | **ArchUnit** | `ArchitectureTest` | architecture rules that fail the build |

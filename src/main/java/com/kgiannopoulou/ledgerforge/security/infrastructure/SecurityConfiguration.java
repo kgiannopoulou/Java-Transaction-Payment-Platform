@@ -85,6 +85,8 @@ class SecurityConfiguration {
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/token").permitAll() // dev profile only
                         .requestMatchers("/error").permitAll()
+                        // only served at all when LEDGERFORGE_API_DOCS is on
+                        .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
 
                         // onboarding and operator actions
                         .requestMatchers(HttpMethod.POST, "/api/v1/customers").hasRole(ADMIN)

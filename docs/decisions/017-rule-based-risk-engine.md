@@ -1,4 +1,4 @@
-# ADR 0016: A small synchronous rule engine for payment risk
+# ADR 017: A small synchronous rule engine for payment risk
 
 **Status:** Accepted · 2026-11-04
 

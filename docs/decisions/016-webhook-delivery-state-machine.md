@@ -1,6 +1,6 @@
-# ADR 0014: Webhook delivery as a state machine in PostgreSQL
+# ADR 016: Webhook delivery as a state machine in PostgreSQL
 
-**Status:** Accepted · 2026-11-04 · Refines [ADR 0012](0012-idempotent-consumers-retries-and-dlt.md)
+**Status:** Accepted · 2026-11-04 · Refines [ADR 005](005-kafka-event-delivery.md)
 
 ## Context
 

@@ -33,7 +33,7 @@ the caller's transaction, so:
 Why not feed the audit trail from Kafka? An audit log that is written asynchronously can lag,
 and if a consumer is broken it can miss events. Writing it in the same ACID transaction is the
 stronger guarantee, and here it is cheap. The trail can still be *exported* downstream (e.g.
-to a SIEM) later. See [ADR 0010](decisions/0010-append-only-audit-in-the-business-transaction.md).
+to a SIEM) later. See [ADR 014](decisions/014-append-only-audit-in-the-business-transaction.md).
 
 ## Append-only: never `UPDATE audit_events`
 

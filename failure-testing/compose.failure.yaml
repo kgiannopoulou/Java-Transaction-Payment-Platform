@@ -1,0 +1,16 @@
+# Adds a webhook receiver that can be killed, on top of compose.yaml:
+#
+#   docker compose -f compose.yaml -f failure-testing/compose.failure.yaml up -d --build --wait
+services:
+  receiver:
+    image: python:3.13-alpine
+    command: ["python", "/receiver.py"]
+    volumes:
+      - ./failure-testing/receiver.py:/receiver.py:ro
+    ports:
+      - "9099:9000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/received')"]
+      interval: 2s
+      timeout: 2s
+      retries: 10

@@ -6,6 +6,7 @@ import com.kgiannopoulou.ledgerforge.support.Concurrently;
 import com.kgiannopoulou.ledgerforge.support.ApiTestSupport;
 import com.kgiannopoulou.ledgerforge.support.PostgresContainers;
 import com.kgiannopoulou.ledgerforge.support.RedisContainers;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Uses its own PostgreSQL container: the corruption it creates on purpose must not leak into
  * the whole-ledger reconciliation run by other tests.
  */
+@Tag("concurrency")
 @TestPropertySource(properties = {
         "ledgerforge.concurrency.locking-mode=NAIVE",
         "ledgerforge.concurrency.simulated-latency=100ms"

@@ -1,4 +1,4 @@
-# ADR 0009: Stateless JWT, non-hierarchical roles, ownership checks
+# ADR 013: Stateless JWT, non-hierarchical roles, ownership checks
 
 **Status:** Accepted · 2026-11-03
 

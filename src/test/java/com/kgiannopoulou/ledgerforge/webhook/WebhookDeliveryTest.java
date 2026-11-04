@@ -9,7 +9,6 @@ import com.kgiannopoulou.ledgerforge.support.PostgresContainers;
 import com.kgiannopoulou.ledgerforge.support.RedisContainers;
 import com.kgiannopoulou.ledgerforge.support.WebhookReceiverStub;
 import com.kgiannopoulou.ledgerforge.webhook.application.WebhookDispatcher;
-import com.kgiannopoulou.ledgerforge.webhook.application.WebhookEvent;
 import com.kgiannopoulou.ledgerforge.webhook.application.WebhookFanOutService;
 import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookSignature;
 import org.junit.jupiter.api.AfterEach;

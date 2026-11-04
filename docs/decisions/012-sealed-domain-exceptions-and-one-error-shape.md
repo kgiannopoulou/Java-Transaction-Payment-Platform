@@ -1,4 +1,4 @@
-# ADR 0008: Sealed domain exceptions and one error shape
+# ADR 012: Sealed domain exceptions and one error shape
 
 **Status:** Accepted · 2026-11-03
 

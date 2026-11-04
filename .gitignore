@@ -34,3 +34,7 @@ build/
 
 # jqwik run data
 .jqwik-database
+
+# Local experiment output
+performance/results/latest/
+failure-testing/results/

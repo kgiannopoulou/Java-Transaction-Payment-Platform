@@ -4,6 +4,7 @@ import com.kgiannopoulou.ledgerforge.shared.transaction.RetryingTransactionExecu
 import com.kgiannopoulou.ledgerforge.support.ApiClient;
 import com.kgiannopoulou.ledgerforge.support.Concurrently;
 import com.kgiannopoulou.ledgerforge.support.IntegrationTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * time ({@code UPDATE ... WHERE version = ?} matches 0 rows) and the whole transaction is retried.
  * Correctness is identical to pessimistic locking; the cost moves from waiting to retrying.
  */
+@Tag("concurrency")
 @TestPropertySource(properties = {
         "ledgerforge.concurrency.locking-mode=OPTIMISTIC",
         "ledgerforge.concurrency.max-attempts=50",

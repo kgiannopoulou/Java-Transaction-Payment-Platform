@@ -1,4 +1,4 @@
-# ADR 0001: Modular monolith, package by feature
+# ADR 008: Modular monolith, package by feature
 
 **Status:** Accepted · 2026-11-02
 

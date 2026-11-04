@@ -31,7 +31,7 @@ class MetricsApiTest extends IntegrationTest {
 
     /**
      * Micrometer's payments.created. The Prometheus client reserves the "_created" suffix and
-     * strips it; docker/prometheus/prometheus.yml stores it as payments_created_total.
+     * strips it; monitoring/prometheus/prometheus.yml stores it as payments_created_total.
      */
     private static final String PAYMENTS_CREATED = "payments_total";
 
