@@ -1,5 +1,6 @@
 package com.kgiannopoulou.ledgerforge.support;
 
+import org.junit.jupiter.api.Tag;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -10,6 +11,7 @@ import org.testcontainers.kafka.KafkaContainer;
  * broker (KRaft, single node), the outbox relay polling every 100 ms, the risk and webhook
  * consumers, the webhook dispatcher, and short retry backoffs so failure tests finish quickly.
  */
+@Tag("e2e")
 @Import(KafkaTestConfiguration.class)
 public abstract class KafkaIntegrationTest extends ApiTestSupport {
 

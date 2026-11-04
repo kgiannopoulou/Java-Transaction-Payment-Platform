@@ -4,6 +4,7 @@ import com.kgiannopoulou.ledgerforge.ledger.application.LedgerReconciliationServ
 import com.kgiannopoulou.ledgerforge.security.application.JwtTokenIssuer;
 import com.kgiannopoulou.ledgerforge.security.domain.Role;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -42,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "ledgerforge.webhooks.request-timeout=1s",
         "spring.kafka.admin.auto-create=false"
 })
+@Tag("integration")
 public abstract class ApiTestSupport {
 
     @LocalServerPort
