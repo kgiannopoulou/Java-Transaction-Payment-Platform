@@ -10,8 +10,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Threads that make outbound webhook calls. The workload is almost pure waiting, which is what
- * virtual threads are for; {@code PLATFORM} mode exists for comparison. See
- * docs/virtual-threads.md.
+ * virtual threads are for; {@code PLATFORM} mode exists for comparison.
  *
  * <p>Deliberately not an {@code Executor} bean: exposing one would make Spring Boot back off from
  * configuring its own application task executor.

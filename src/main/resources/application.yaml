@@ -161,5 +161,5 @@ ledgerforge:
       poll-interval-ms: 1000
       batch-size: 500
       max-in-flight: 500
-      mode: VIRTUAL   # VIRTUAL or PLATFORM, see docs/virtual-threads.md
+      mode: VIRTUAL   # VIRTUAL or PLATFORM
       platform-pool-size: 50
