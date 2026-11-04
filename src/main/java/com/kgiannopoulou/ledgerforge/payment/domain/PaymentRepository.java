@@ -7,6 +7,9 @@ public interface PaymentRepository {
 
     Payment save(Payment payment);
 
+    /** Writes the row now, for when a plain-SQL insert references it later in the transaction. */
+    Payment saveAndFlush(Payment payment);
+
     Optional<Payment> findById(UUID id);
 
     /**

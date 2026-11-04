@@ -20,9 +20,10 @@ the service could later be split.
                  │  infrastructure/ Spring Data / JDBC / Kafka adapters     │
                  │                                                          │
                  │  outbox relay ──────────────┐   risk + webhook consumers │
-                 └───────────────┬─────────────┼──────────────▲─────────────┘
-                                 │ JDBC        │ produce      │ consume
-                                 ▼             ▼              │
+                 │  webhook dispatcher (virtual threads) ──► customer HTTPS │
+                 └───┬───────────┬─────────────┼──────────────▲─────────────┘
+                     │ Redis     │ JDBC        │ produce      │ consume
+                     │           ▼             ▼              │
   ┌────────────────────────────────────────┐  ┌─────────────────┴────────────┐
   │ PostgreSQL 17 (Flyway V001..V010)     │  │ Kafka 4.1 (KRaft)            │
   │  customers, accounts (+ @Version)      │  │  ledgerforge.payments.v1     │
@@ -32,31 +33,34 @@ the service could later be split.
   │  audit_events (append-only)            │  └──────────────────────────────┘
   │  outbox_events                         │
   │  processed_events, risk_alerts,        │
-  │  webhook_deliveries                    │
+  │  risk_decisions, webhook_endpoints,    │
+  │  webhook_deliveries (+ attempts)       │
   └────────────────────────────────────────┘
+  Redis 7 (disposable): rate limits, ownership cache, risk signals
 ```
 
-Still deliberately absent: Redis (no measured need for caching or distributed rate limits yet)
-and dashboards (metrics are exposed via Actuator/Micrometer; Prometheus/Grafana come next).
+Still deliberately absent: dashboards (metrics are exposed via Actuator/Micrometer;
+Prometheus/Grafana come next).
 
 ## Modules
 
 | Module        | Responsibility                                                          | Depends on                       |
 |---------------|-------------------------------------------------------------------------|----------------------------------|
-| `shared`      | `Money`, error types, integration events, retrying transaction executor, web (errors, trace ids) | nothing (shared kernel) |
+| `shared`      | `Money`, error types, integration events, `EphemeralStore` port, retrying transaction executor, web (errors, trace ids) | nothing (shared kernel) |
 | `customer`    | Customer registration                                                   | audit, shared                    |
 | `account`     | Wallets and system accounts, status lifecycle, **account locking**      | customer, audit, shared          |
 | `idempotency` | `Idempotency-Key` storage and replay                                    | shared                           |
 | `ledger`      | Double-entry posting (the only way to move money), deposits, reconciliation | account, idempotency, shared |
 | `transfer`    | Wallet-to-wallet transfers                                              | ledger, account, audit, shared (events) |
-| `payment`     | Payment state machine: authorize / capture / cancel / refund            | ledger, account, audit, shared (events) |
+| `payment`     | Payment state machine: authorize / capture / cancel / refund / review   | ledger, account, audit, risk, ratelimit, shared (events) |
 | `audit`       | Append-only audit trail, written in the business transaction            | shared                           |
 | `outbox`      | Transactional outbox (implements the events port) and the relay to Kafka | shared                          |
 | `messaging`   | Consumer idempotency (`processed_events`), topics, retry/backoff/DLT policy | shared                       |
-| `risk`        | Kafka consumer: large-amount alerts                                     | messaging, shared                |
-| `webhook`     | Kafka consumer: merchant notifications                                  | messaging, shared                |
-| `security`    | JWT resource server, roles, `AccessPolicy` ownership checks             | account, transfer, payment (read-only ports) |
-| `infrastructure` | Cross-cutting technical config (clock)                               |                                  |
+| `risk`        | Synchronous rule engine and decisions; Kafka consumer for after-the-fact alerts | messaging, shared        |
+| `webhook`     | Endpoint registration, Kafka fan-out, signed delivery with retries      | messaging, audit, shared         |
+| `ratelimit`   | Per-account limits on top of Redis                                      | shared                           |
+| `security`    | JWT resource server, roles, `AccessPolicy` ownership checks             | account, transfer, payment, webhook (read-only ports) |
+| `infrastructure` | Cross-cutting technical config (clock), Redis adapter                |                                  |
 
 Each feature module has the same internal layout:
 
@@ -81,6 +85,8 @@ transfer/
 - No `double`/`float` fields anywhere; domain amounts are `BigDecimal` or `Money`. (It even caught
   a `double` retry multiplier in the Kafka configuration.)
 - No field injection.
+- **The financial core never touches Redis**: `ledger`, `account`, `transfer` and `payment` cannot
+  depend on the `EphemeralStore` port, and only its adapter may use Spring Data Redis.
 
 ## Request flow: `POST /api/v1/transfers`
 

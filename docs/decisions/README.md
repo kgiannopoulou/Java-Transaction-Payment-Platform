@@ -21,3 +21,4 @@ context, decision, consequences.
 | [0013](0013-migration-layout-and-rebaseline.md) | Migration layout, and a one-time re-baseline | Accepted |
 | [0014](0014-webhook-delivery-state-machine.md) | Webhook delivery as a state machine in PostgreSQL | Accepted |
 | [0015](0015-redis-for-disposable-state-only.md) | Redis for disposable state only; PostgreSQL stays the source of truth | Accepted |
+| [0016](0016-rule-based-risk-engine.md) | A small synchronous rule engine for payment risk | Accepted |

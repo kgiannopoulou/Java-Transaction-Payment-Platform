@@ -21,6 +21,8 @@ moment, and losing all of it must never lose or change money.
 |-----|-----|-----------|------------------|
 | **Rate limit:** 100 × `POST /payments` per minute per account | `ratelimit:payments:<account>` | every instance has to see the same count | **fails open**: requests pass, counter `ledgerforge.ratelimit.decisions{result=unavailable}` rises |
 | **Short-lived cache:** who owns an account | `cache:account-owner:<account>` | this runs on nearly every customer request | falls back to PostgreSQL |
+| **Distributed counter:** payment attempts per account, 30 s window | `risk:attempts:<account>` | `VelocityRule` has to count attempts from all instances | velocity rule skipped, decision marked `degraded` |
+| **Temporary risk signal:** failed payments per account, 10 min window | `risk:failures:<account>` | useful for minutes, and must survive the transaction rollback that the failure causes | failure rule skipped, decision marked `degraded` |
 
 ## What it must never be used for
 
@@ -91,6 +93,15 @@ that could wrongly report "active" on a frozen account would be a security bug.
 
 This saves a query per request, not a connection: `AccessPolicy` still runs in a read-only
 transaction. Moving it out would be the next step if the pool ever became the bottleneck.
+
+## Risk signals
+
+Counters feed the [risk engine](risk-engine.md). They only matter for minutes, and they expire by
+themselves. The lasting record of what was decided, and why, is in `risk_decisions` in PostgreSQL.
+
+If Redis is down, the velocity and repeated-failure rules cannot run. The rules that rely on
+PostgreSQL (frozen account, large transaction) still do, and the decision is stored with
+`degraded = true`, so operators can find out exactly which decisions were made with less information.
 
 ## Operating it
 

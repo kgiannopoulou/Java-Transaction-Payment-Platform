@@ -60,6 +60,9 @@ class SecurityConfiguration {
                                 "/api/v1/accounts/*/close").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.POST, "/api/v1/accounts").hasAnyRole(CUSTOMER, ADMIN)
 
+                        // decided by staff; before the customer rule below, which would match it too
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/*/review").hasAnyRole(SUPPORT, ADMIN)
+
                         // only account holders move money
                         .requestMatchers(HttpMethod.POST, "/api/v1/transfers", "/api/v1/payments", "/api/v1/payments/**")
                         .hasRole(CUSTOMER)

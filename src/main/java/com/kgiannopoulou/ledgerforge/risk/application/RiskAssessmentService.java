@@ -20,8 +20,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Downstream risk engine fed by Kafka. Deliberately simple (one large-amount rule): the point
- * is the consumer mechanics around it, i.e. idempotency, retries and the DLT.
+ * After-the-fact monitoring fed by Kafka: raises alerts on completed movements, with no power to
+ * stop them. The rules that can stop a payment run before it exists, in {@link RiskEngine}.
  */
 @Service
 public class RiskAssessmentService {

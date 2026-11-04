@@ -94,6 +94,27 @@ public class Payment extends BaseEntity {
         }
     }
 
+    public void holdForReview(Instant now) {
+        transition(PaymentStatus.UNDER_REVIEW, now);
+    }
+
+    /** Back to CREATED: the payer can now authorize as usual. */
+    public void approveReview(Instant now) {
+        requireUnderReview();
+        transition(PaymentStatus.CREATED, now);
+    }
+
+    public void rejectReview(Instant now) {
+        requireUnderReview();
+        transition(PaymentStatus.CANCELLED, now);
+    }
+
+    private void requireUnderReview() {
+        if (status != PaymentStatus.UNDER_REVIEW) {
+            throw new BusinessRuleViolationException("PAYMENT_NOT_UNDER_REVIEW", "Payment " + getId() + " is not under review");
+        }
+    }
+
     public void markAuthorized(Instant now) {
         transition(PaymentStatus.AUTHORIZED, now);
     }

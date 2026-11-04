@@ -1,6 +1,7 @@
 package com.kgiannopoulou.ledgerforge.payment.domain;
 
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -16,7 +17,8 @@ public sealed interface PaymentCommand
         permits PaymentCommand.AuthorizePayment,
                 PaymentCommand.CapturePayment,
                 PaymentCommand.CancelPayment,
-                PaymentCommand.RefundPayment {
+                PaymentCommand.RefundPayment,
+                PaymentCommand.ReviewPayment {
 
     UUID paymentId();
 
@@ -37,6 +39,13 @@ public sealed interface PaymentCommand
     /** Void before capture; releases any hold back to the payer. */
     record CancelPayment(UUID paymentId) implements PaymentCommand {
         public CancelPayment {
+            Objects.requireNonNull(paymentId);
+        }
+    }
+
+    /** A reviewer's decision on a payment held by the risk engine. No money moves. */
+    record ReviewPayment(UUID paymentId, boolean approved, @Nullable String note) implements PaymentCommand {
+        public ReviewPayment {
             Objects.requireNonNull(paymentId);
         }
     }

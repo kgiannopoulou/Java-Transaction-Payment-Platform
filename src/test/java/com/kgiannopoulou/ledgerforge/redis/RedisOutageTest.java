@@ -4,6 +4,8 @@ import com.kgiannopoulou.ledgerforge.support.ApiTestSupport;
 import com.kgiannopoulou.ledgerforge.support.PostgresContainers;
 import com.kgiannopoulou.ledgerforge.support.RedisContainers;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -22,6 +24,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RedisOutageTest extends ApiTestSupport {
 
     private static final GenericContainer<?> REDIS = RedisContainers.start();
+
+    @Autowired
+    JdbcClient jdbc;
 
     @DynamicPropertySource
     static void infrastructure(DynamicPropertyRegistry registry) {
@@ -52,6 +57,10 @@ class RedisOutageTest extends ApiTestSupport {
         assertLedgerConsistentFor(java.util.List.of(payer, merchant));
 
         assertThat(anonymous.get("/actuator/health/readiness").status()).as("still ready for traffic").isEqualTo(200);
+
+        // The rules that need Redis could not run, and the permanent record says so.
+        assertThat(jdbc.sql("SELECT degraded FROM risk_decisions WHERE payment_id = ?").param(payment)
+                .query(Boolean.class).single()).isTrue();
     }
 
     private com.kgiannopoulou.ledgerforge.support.ApiClient.Response createPayment(UUID payer, UUID merchant) {

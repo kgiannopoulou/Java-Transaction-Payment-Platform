@@ -55,9 +55,10 @@ classes live in `shared.error`.
 | 400 | `INVALID_PARAMETER` | Path/query parameter of the wrong type (e.g. not a UUID). |
 | 400 | `INVALID_AMOUNT` | More decimal places than the currency allows. |
 | 400 | `INVALID_IDEMPOTENCY_KEY` | Blank or longer than 255 characters. |
+| 400 | `INVALID_WEBHOOK_URL`, `UNKNOWN_WEBHOOK_EVENT_TYPE` | Webhook registration: malformed, non-HTTPS or internal URL; unknown event type. |
 | 401 | `UNAUTHENTICATED` | Missing, invalid, expired or foreign token. The reason is not disclosed. |
 | 403 | `ACCESS_DENIED` | Role not allowed, or the resource is not yours (also for ids that do not exist; see [security.md](security.md)). |
-| 404 | `CUSTOMER_NOT_FOUND`, `ACCOUNT_NOT_FOUND`, `TRANSFER_NOT_FOUND`, `PAYMENT_NOT_FOUND`, `LEDGER_TRANSACTION_NOT_FOUND` | Unknown id. |
+| 404 | `CUSTOMER_NOT_FOUND`, `ACCOUNT_NOT_FOUND`, `TRANSFER_NOT_FOUND`, `PAYMENT_NOT_FOUND`, `LEDGER_TRANSACTION_NOT_FOUND`, `WEBHOOK_ENDPOINT_NOT_FOUND`, `WEBHOOK_DELIVERY_NOT_FOUND` | Unknown id. |
 | 404 | `NOT_FOUND` | Unknown route. |
 | 405 / 415 | `METHOD_NOT_ALLOWED` / `UNSUPPORTED_MEDIA_TYPE` | Framework errors, same shape. |
 | 409 | `EMAIL_ALREADY_REGISTERED`, `ACCOUNT_ALREADY_EXISTS` | Uniqueness. |
@@ -66,10 +67,15 @@ classes live in `shared.error`.
 | 409 | `IDEMPOTENCY_KEY_REUSED` | Same `Idempotency-Key`, different request body. |
 | 409 | `CONCURRENT_MODIFICATION` | Optimistic-locking retries exhausted. |
 | 409 | `CONSTRAINT_VIOLATION` | A database constraint caught a race. |
+| 409 | `WEBHOOK_DELIVERY_NOT_DEAD`, `WEBHOOK_ENDPOINT_DISABLED` | Replay of a delivery that is not dead, or whose endpoint is disabled. |
 | 422 | `INSUFFICIENT_FUNDS` | Debit exceeds the available balance. |
 | 422 | `ACCOUNT_FROZEN` / `ACCOUNT_CLOSED` | Money movement on an inactive wallet. |
+| 422 | `PAYMENT_BLOCKED` | Refused by the risk engine. Deliberately gives no reason; see [risk-engine.md](risk-engine.md). |
+| 422 | `PAYMENT_NOT_UNDER_REVIEW` | A review decision on a payment that is not waiting for one. |
+| 422 | `WEBHOOK_ENDPOINT_LIMIT_REACHED` | The account already has the maximum number of active endpoints. |
 | 422 | `CURRENCY_MISMATCH` | Account, counterparty and request currencies differ. |
 | 422 | `SAME_ACCOUNT`, `NOT_A_WALLET`, `UNSUPPORTED_CURRENCY`, `CUSTOMER_NOT_ACTIVE`, `ACCOUNT_BALANCE_NOT_ZERO`, `REFUND_EXCEEDS_CAPTURED`, `SYSTEM_ACCOUNT` | Other business rules. |
+| 429 | `RATE_LIMIT_EXCEEDED` | Too many payments; see the `Retry-After` header. |
 | 500 | `INTERNAL_ERROR` | Anything unexpected. The body is generic; the stack trace is in the logs under the `traceId`. |
 
 ## What is never returned

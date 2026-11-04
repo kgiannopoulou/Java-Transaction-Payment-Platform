@@ -36,7 +36,12 @@ class PaymentStateMachineTest {
             "PARTIALLY_REFUNDED,CAPTURED,false", "PARTIALLY_REFUNDED,CANCELLED,false",
             "REFUNDED,CAPTURED,false", "REFUNDED,PARTIALLY_REFUNDED,false", "REFUNDED,CANCELLED,false",
             "REFUNDED,REFUNDED,false", "CANCELLED,AUTHORIZED,false", "CANCELLED,CAPTURED,false",
-            "CANCELLED,CANCELLED,false"
+            "CANCELLED,CANCELLED,false",
+            "CREATED,UNDER_REVIEW,true", "UNDER_REVIEW,CREATED,true", "UNDER_REVIEW,CANCELLED,true",
+            "UNDER_REVIEW,AUTHORIZED,false", "UNDER_REVIEW,CAPTURED,false", "UNDER_REVIEW,REFUNDED,false",
+            "UNDER_REVIEW,PARTIALLY_REFUNDED,false", "UNDER_REVIEW,UNDER_REVIEW,false",
+            "AUTHORIZED,UNDER_REVIEW,false", "CAPTURED,UNDER_REVIEW,false", "PARTIALLY_REFUNDED,UNDER_REVIEW,false",
+            "REFUNDED,UNDER_REVIEW,false", "CANCELLED,UNDER_REVIEW,false"
     })
     void transitionTable(PaymentStatus from, PaymentStatus to, boolean allowed) {
         assertThat(from.canTransitionTo(to)).isEqualTo(allowed);
@@ -134,6 +139,7 @@ class PaymentStateMachineTest {
             case PaymentCommand.CapturePayment c -> "capture";
             case PaymentCommand.CancelPayment c -> "cancel";
             case PaymentCommand.RefundPayment r -> "refund " + r.amount();
+            case PaymentCommand.ReviewPayment r -> "review";
         };
         assertThat(label).isEqualTo("refund EUR 5.00");
     }

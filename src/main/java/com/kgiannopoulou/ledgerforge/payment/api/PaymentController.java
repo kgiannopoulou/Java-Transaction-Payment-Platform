@@ -5,12 +5,16 @@ import com.kgiannopoulou.ledgerforge.idempotency.api.IdempotencyHeaders;
 import com.kgiannopoulou.ledgerforge.idempotency.application.IdempotentOperations;
 import com.kgiannopoulou.ledgerforge.payment.application.PaymentService;
 import com.kgiannopoulou.ledgerforge.payment.application.PaymentService.CreatePaymentCommand;
+import com.kgiannopoulou.ledgerforge.account.domain.InsufficientFundsException;
+import com.kgiannopoulou.ledgerforge.payment.domain.PaymentBlockedException;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.AuthorizePayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.CancelPayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.CapturePayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.RefundPayment;
+import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.ReviewPayment;
 import com.kgiannopoulou.ledgerforge.ratelimit.application.RateLimiter;
+import com.kgiannopoulou.ledgerforge.risk.application.RiskSignals;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -32,11 +36,14 @@ class PaymentController {
     private final PaymentService paymentService;
     private final IdempotentOperations idempotent;
     private final RateLimiter rateLimiter;
+    private final RiskSignals riskSignals;
 
-    PaymentController(PaymentService paymentService, IdempotentOperations idempotent, RateLimiter rateLimiter) {
+    PaymentController(PaymentService paymentService, IdempotentOperations idempotent, RateLimiter rateLimiter,
+                      RiskSignals riskSignals) {
         this.paymentService = paymentService;
         this.idempotent = idempotent;
         this.rateLimiter = rateLimiter;
+        this.riskSignals = riskSignals;
     }
 
     @PostMapping
@@ -48,9 +55,16 @@ class PaymentController {
         rateLimiter.checkPaymentCreation(request.payerAccountId());
         var command = new CreatePaymentCommand(request.payerAccountId(), request.merchantAccountId(),
                 Money.of(request.amount(), request.currency()), request.description());
-        var result = idempotent.execute("payment.create", idempotencyKey, request, PaymentResponse.class,
-                HttpStatus.CREATED.value(), () -> PaymentResponse.from(paymentService.create(command)));
-        return IdempotencyHeaders.respond(result);
+        try {
+            var result = idempotent.execute("payment.create", idempotencyKey, request, PaymentResponse.class,
+                    HttpStatus.CREATED.value(), () -> PaymentResponse.from(paymentService.create(command)));
+            return IdempotencyHeaders.respond(result);
+        } catch (PaymentBlockedException e) {
+            // Here rather than in the service: the transaction has rolled back by now, so the
+            // record of the refusal survives. No database locks or connections are held either.
+            paymentService.recordBlocked(e.screened());
+            throw e;
+        }
     }
 
     @GetMapping("/{id}")
@@ -64,7 +78,12 @@ class PaymentController {
     ResponseEntity<PaymentResponse> authorize(
             @PathVariable UUID id,
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey) {
-        return handle("payment.authorize", idempotencyKey, new AuthorizePayment(id));
+        try {
+            return handle("payment.authorize", idempotencyKey, new AuthorizePayment(id));
+        } catch (InsufficientFundsException e) {
+            riskSignals.recordFailure(e.accountId()); // after rollback, with no account locks held
+            throw e;
+        }
     }
 
     @PostMapping("/{id}/capture")
@@ -91,6 +110,16 @@ class PaymentController {
             @Valid @RequestBody RefundRequest request) {
         return handle("payment.refund", idempotencyKey,
                 new RefundPayment(id, Money.of(request.amount(), request.currency())));
+    }
+
+    /** SUPPORT and ADMIN only (see SecurityConfiguration). */
+    @PostMapping("/{id}/review")
+    ResponseEntity<PaymentResponse> review(
+            @PathVariable UUID id,
+            @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey,
+            @Valid @RequestBody ReviewRequest request) {
+        return handle("payment.review", idempotencyKey,
+                new ReviewPayment(id, request.decision() == ReviewRequest.Decision.APPROVE, request.note()));
     }
 
     /** The command record itself (payment id + amount) is the idempotency fingerprint. */

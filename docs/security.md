@@ -26,10 +26,10 @@ outside a demo environment.
 
 | Role | May | May not |
 |------|-----|---------|
-| `CUSTOMER` | open own wallets; read own customer profile, wallets, history, transfers, payments; transfer from own wallets; pay (as payer: create, authorize, cancel); collect (as merchant: capture, refund, cancel) | anything belonging to another customer; deposits; freeze/close; back-office reads |
-| `SUPPORT` | read any customer, wallet, history, transfer, payment, ledger transaction, risk alert | move money, deposit, freeze, read the audit trail |
-| `AUDITOR` | read wallets, history, ledger transactions, transfers, payments, reconciliation, **audit events**, risk alerts | modify anything; read customer profiles (PII) |
-| `ADMIN` | onboard customers, open wallets for anyone, deposit, freeze / unfreeze / close, read everything incl. audit events, actuator details | move a customer's money (transfer or pay on their behalf) |
+| `CUSTOMER` | open own wallets; read own customer profile, wallets, history, transfers, payments; transfer from own wallets; pay (as payer: create, authorize, cancel); collect (as merchant: capture, refund, cancel); manage webhook endpoints on own wallets | anything belonging to another customer; deposits; freeze/close; back-office reads |
+| `SUPPORT` | read any customer, wallet, history, transfer, payment, ledger transaction, risk alert, risk decision, webhook delivery; **approve or reject payments under review** | move money, deposit, freeze, read the audit trail, change webhooks |
+| `AUDITOR` | read wallets, history, ledger transactions, transfers, payments, reconciliation, **audit events**, risk alerts, risk decisions, webhook deliveries | modify anything; read customer profiles (PII) |
+| `ADMIN` | onboard customers, open wallets for anyone, deposit, freeze / unfreeze / close, approve or reject payments under review, read everything incl. audit events, actuator details | move a customer's money (transfer or pay on their behalf); change a customer's webhooks |
 
 Roles are **not hierarchical**. An admin who could also spend customers' money, or an auditor
 who could also change what they audit, would defeat separation of duties.
@@ -54,7 +54,8 @@ request ─► BearerTokenAuthenticationFilter ─► URL rules (role gates)  �
 
    Ownership is read from the database (`accounts.customer_id`, the payment's payer/merchant
    wallets) and compared to the token's `customer_id`. It is checked *before* the business
-   transaction. That is safe because ownership never changes after creation.
+   transaction. That is safe because ownership never changes after creation, which is also why
+   the account lookup can be cached in Redis ([redis.md](redis.md)).
 
 Feature modules do not depend on the security module at compile time (the SpEL string names
 the bean), so the module graph stays acyclic. `ArchitectureTest` checks that.
@@ -70,6 +71,15 @@ enumerate valid account ids. Staff roles, who are allowed to know, get the usual
 401 and 403 use the same error shape as every other error (`UNAUTHENTICATED`,
 `ACCESS_DENIED`, with a `traceId`). The 401 never explains *why* a token was rejected
 (expired, bad signature, wrong issuer); that would help an attacker more than a client.
+
+### Abuse controls
+
+- **Rate limits**: 100 `POST /payments` per minute per account, after authorization, so nobody can
+  use up someone else's allowance ([redis.md](redis.md)).
+- **Risk screening** refuses or holds payments, and a refusal never says which rule fired
+  ([risk-engine.md](risk-engine.md)).
+- **Webhooks** are outbound calls to customer-chosen URLs, so they have SSRF protection and
+  encrypted signing secrets ([webhooks.md](webhooks.md)).
 
 ## Tested, not just configured
 

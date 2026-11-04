@@ -89,6 +89,9 @@ CREATED ──► AUTHORIZED ──► CAPTURED ──► PARTIALLY_REFUNDED ─
 | cancel    | PAYMENT_HOLDS DEBIT → payer wallet CREDIT (only if authorized) |
 | refund    | merchant wallet DEBIT → payer wallet CREDIT        |
 
+- The risk engine can hold a new payment in `UNDER_REVIEW`, where no money can move. Approval
+  returns it to `CREATED`, and rejection (or the payer cancelling) moves it to `CANCELLED`. See
+  [risk-engine.md](risk-engine.md).
 - The transition table lives in `PaymentStatus` as data (`EnumMap<PaymentStatus, EnumSet<…>>`)
   and is tested exhaustively (every from/to pair).
 - Invalid transitions return **409** `INVALID_PAYMENT_STATE` (e.g. `CANCELLED → CAPTURED`); capturing a payment that was already captured (`CAPTURED`, `PARTIALLY_REFUNDED`, `REFUNDED → CAPTURED`) returns the more specific **409** `PAYMENT_ALREADY_CAPTURED`.

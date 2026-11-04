@@ -11,14 +11,20 @@ import java.util.Set;
  *
  * <pre>
  *   CREATED ──► AUTHORIZED ──► CAPTURED ──► PARTIALLY_REFUNDED ──► REFUNDED
- *      │            │              └──────────────────────────────────▲
- *      └────────────┴──► CANCELLED
+ *    │ ▲ │          │              └──────────────────────────────────▲
+ *    │ │ └──────────┴──► CANCELLED
+ *    ▼ │ approved            ▲
+ *   UNDER_REVIEW ────────────┘ rejected
  * </pre>
+ *
+ * A payment the risk engine wants a person to look at waits in {@code UNDER_REVIEW}, where no
+ * money can move: it cannot be authorized until a reviewer approves it.
  *
  * The transition table is data, not scattered {@code if}s, so it can be tested exhaustively.
  */
 public enum PaymentStatus {
     CREATED,
+    UNDER_REVIEW,
     AUTHORIZED,
     CAPTURED,
     PARTIALLY_REFUNDED,
@@ -28,7 +34,8 @@ public enum PaymentStatus {
     private static final Map<PaymentStatus, Set<PaymentStatus>> TRANSITIONS = new EnumMap<>(PaymentStatus.class);
 
     static {
-        TRANSITIONS.put(CREATED, EnumSet.of(AUTHORIZED, CANCELLED));
+        TRANSITIONS.put(CREATED, EnumSet.of(UNDER_REVIEW, AUTHORIZED, CANCELLED));
+        TRANSITIONS.put(UNDER_REVIEW, EnumSet.of(CREATED, CANCELLED));
         TRANSITIONS.put(AUTHORIZED, EnumSet.of(CAPTURED, CANCELLED));
         TRANSITIONS.put(CAPTURED, EnumSet.of(PARTIALLY_REFUNDED, REFUNDED));
         TRANSITIONS.put(PARTIALLY_REFUNDED, EnumSet.of(PARTIALLY_REFUNDED, REFUNDED));

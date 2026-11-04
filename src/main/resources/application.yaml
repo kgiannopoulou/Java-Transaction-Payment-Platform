@@ -135,6 +135,16 @@ ledgerforge:
       window: 1m
   risk:
     large-amount-threshold: 10000.00
+    rules:
+      velocity:           # BLOCK
+        max-attempts: 20
+        window: 30s
+      large-transaction:  # REVIEW
+        threshold: 7500.00
+        new-account-age: 30d
+      repeated-failure:   # REVIEW
+        max-failures: 5
+        window: 10m
   webhooks:
     # Encrypts signing secrets at rest. Dev default only: real deployments inject
     # LEDGERFORGE_WEBHOOK_ENCRYPTION_KEY from a secret store.

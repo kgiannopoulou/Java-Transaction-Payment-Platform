@@ -14,14 +14,21 @@ import com.kgiannopoulou.ledgerforge.account.domain.InsufficientFundsException;
 import com.kgiannopoulou.ledgerforge.ledger.application.LedgerService;
 import com.kgiannopoulou.ledgerforge.ledger.domain.LedgerTransactionType;
 import com.kgiannopoulou.ledgerforge.ledger.domain.Posting;
+import com.kgiannopoulou.ledgerforge.account.domain.AccountStatus;
 import com.kgiannopoulou.ledgerforge.payment.domain.Payment;
+import com.kgiannopoulou.ledgerforge.payment.domain.PaymentBlockedException;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.AuthorizePayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.CancelPayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.CapturePayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.RefundPayment;
+import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.ReviewPayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentRepository;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentStatus;
+import com.kgiannopoulou.ledgerforge.risk.application.PaymentScreening;
+import com.kgiannopoulou.ledgerforge.risk.domain.RiskDecision;
+import com.kgiannopoulou.ledgerforge.risk.domain.RiskOutcome;
+import com.kgiannopoulou.ledgerforge.risk.domain.ScreenedPayment;
 import com.kgiannopoulou.ledgerforge.shared.error.BusinessRuleViolationException;
 import com.kgiannopoulou.ledgerforge.shared.error.NotFoundException;
 import com.kgiannopoulou.ledgerforge.shared.money.CurrencyMismatchException;
@@ -55,17 +62,19 @@ public class PaymentService {
     private final LedgerService ledgerService;
     private final AuditTrail audit;
     private final IntegrationEventPublisher events;
+    private final PaymentScreening screening;
     private final Clock clock;
 
     public PaymentService(PaymentRepository payments, AccountService accountService, AccountLocks accountLocks,
                           LedgerService ledgerService, AuditTrail audit, IntegrationEventPublisher events,
-                          Clock clock) {
+                          PaymentScreening screening, Clock clock) {
         this.payments = payments;
         this.accountService = accountService;
         this.accountLocks = accountLocks;
         this.ledgerService = ledgerService;
         this.audit = audit;
         this.events = events;
+        this.screening = screening;
         this.clock = clock;
     }
 
@@ -78,20 +87,43 @@ public class PaymentService {
         Payment payment = Payment.create(command.payerAccountId(), command.merchantAccountId(), command.amount(),
                 command.description(), clock.instant());
         // No money moves on creation, so plain reads are enough here.
-        for (UUID accountId : List.of(command.payerAccountId(), command.merchantAccountId())) {
-            Account account = accountService.get(accountId);
-            requireWallet(account);
-            if (!account.getCurrency().equals(command.amount().currency())) {
-                throw new CurrencyMismatchException(account.getCurrency(), command.amount().currency());
-            }
+        Account payer = requireWalletIn(command.payerAccountId(), command.amount());
+        Account merchant = requireWalletIn(command.merchantAccountId(), command.amount());
+        merchant.requireActive();
+        if (payer.getStatus() != AccountStatus.FROZEN) {
+            payer.requireActive(); // a frozen payer is the risk engine's call, so the refusal is recorded
         }
-        Payment saved = payments.save(payment);
+
+        ScreenedPayment screened = screening.screen(payer.getId(), merchant.getId(), command.amount(),
+                payer.getStatus() == AccountStatus.FROZEN, payer.getCreatedAt());
+        if (screened.outcome() == RiskOutcome.BLOCK) {
+            throw new PaymentBlockedException(screened);
+        }
+        if (screened.outcome() == RiskOutcome.REVIEW) {
+            payment.holdForReview(clock.instant());
+        }
+
+        // Flushed first: JPA would otherwise delay this INSERT until after the decision that references it.
+        Payment saved = payments.saveAndFlush(payment);
+        screening.record(saved.getId(), screened);
         audit.record(AuditAction.PAYMENT_CREATED, AuditedEntity.PAYMENT, saved.getId(), Map.of(
                 "payerAccountId", saved.getPayerAccountId().toString(),
                 "merchantAccountId", saved.getMerchantAccountId().toString(),
                 "amount", saved.getAmount().amount().toPlainString(),
-                "currency", saved.getCurrency().getCurrencyCode()));
+                "currency", saved.getCurrency().getCurrencyCode(),
+                "riskOutcome", screened.outcome().name()));
         return saved;
+    }
+
+    /** Records a refusal. Called after the request's transaction has rolled back. */
+    @Transactional
+    public void recordBlocked(ScreenedPayment screened) {
+        screening.recordBlocked(screened);
+        audit.record(AuditAction.PAYMENT_BLOCKED, AuditedEntity.ACCOUNT, screened.payerAccountId(), Map.of(
+                "merchantAccountId", screened.merchantAccountId().toString(),
+                "amount", screened.amount().amount().toPlainString(),
+                "currency", screened.amount().currency().getCurrencyCode(),
+                "rules", screened.assessment().triggered().stream().map(RiskDecision::rule).toList()));
     }
 
     @Transactional
@@ -105,6 +137,7 @@ public class PaymentService {
             case CapturePayment ignored -> capture(payment);
             case CancelPayment ignored -> cancel(payment);
             case RefundPayment refund -> refund(payment, refund.amount());
+            case ReviewPayment review -> review(payment, review);
         }
         return payment;
     }
@@ -178,6 +211,18 @@ public class PaymentService {
                 payment.getStatus() == PaymentStatus.REFUNDED, clock.instant()));
     }
 
+    private void review(Payment payment, ReviewPayment review) {
+        if (review.approved()) {
+            payment.approveReview(clock.instant());
+        } else {
+            payment.rejectReview(clock.instant());
+        }
+        audit.record(review.approved() ? AuditAction.PAYMENT_REVIEW_APPROVED : AuditAction.PAYMENT_REVIEW_REJECTED,
+                AuditedEntity.PAYMENT, payment.getId(), Map.of(
+                        "status", payment.getStatus().name(),
+                        "note", review.note() == null ? "" : review.note()));
+    }
+
     private void auditPayment(Payment payment, AuditAction action, Money amount) {
         audit.record(action, AuditedEntity.PAYMENT, payment.getId(), Map.of(
                 "status", payment.getStatus().name(),
@@ -189,10 +234,14 @@ public class PaymentService {
         return accountService.systemAccountId(AccountType.PAYMENT_HOLDS, payment.getCurrency());
     }
 
-    private static void requireWallet(Account account) {
+    private Account requireWalletIn(UUID accountId, Money amount) {
+        Account account = accountService.get(accountId);
         if (account.getType() != AccountType.CUSTOMER_WALLET) {
             throw new BusinessRuleViolationException("NOT_A_WALLET", "Payments are only allowed between customer wallets");
         }
-        account.requireActive();
+        if (!account.getCurrency().equals(amount.currency())) {
+            throw new CurrencyMismatchException(account.getCurrency(), amount.currency());
+        }
+        return account;
     }
 }
