@@ -27,14 +27,14 @@ backed by tests against a real PostgreSQL and a real Kafka broker.
 | Area | Where to look |
 |------|---------------|
 | **Concurrency**: lost updates reproduced, then prevented with row locks + deterministic lock ordering; optimistic locking with retries as an alternative | [`docs/concurrency.md`](docs/concurrency.md), [`concurrency/`](src/test/java/com/kgiannopoulou/ledgerforge/concurrency) |
-| **Double-entry ledger**: balanced, append-only, enforced by Java *and* PostgreSQL triggers, with raw-SQL reconciliation | [`docs/ledger-invariants.md`](docs/ledger-invariants.md), [`V2__ledger.sql`](src/main/resources/db/migration/V2__ledger.sql) |
+| **Double-entry ledger**: balanced, append-only, enforced by Java *and* PostgreSQL triggers, with raw-SQL reconciliation | [`docs/ledger-invariants.md`](docs/ledger-invariants.md), [`V003__create_ledger.sql`](src/main/resources/db/migration/V003__create_ledger.sql) |
 | **Idempotency**: `Idempotency-Key` stored in the same transaction as the money movement; 100 identical concurrent requests → 1 transfer | [`docs/idempotency.md`](docs/idempotency.md) |
 | **Modern Java**: records, sealed interfaces + exhaustive pattern-matching `switch`, `BigDecimal` money, virtual threads, streams | [`Money`](src/main/java/com/kgiannopoulou/ledgerforge/shared/money/Money.java), [`PaymentCommand`](src/main/java/com/kgiannopoulou/ledgerforge/payment/domain/PaymentCommand.java), [`PaymentService`](src/main/java/com/kgiannopoulou/ledgerforge/payment/application/PaymentService.java) |
 | **Spring**: MVC, Bean Validation, Data JPA, transactions (propagation, isolation, programmatic retry), configuration properties, RFC 9457 problem details | [`docs/architecture.md`](docs/architecture.md) |
-| **Databases**: Flyway migrations, constraints, partial unique indexes, deferred constraint triggers, `SELECT … FOR UPDATE`, `ON CONFLICT`, `REPEATABLE READ` | [`db/migration`](src/main/resources/db/migration) |
+| **Databases**: Flyway migrations, defence-in-depth constraints (raw-SQL tested), composite foreign keys, partial unique indexes, deferred constraint triggers, `SELECT … FOR UPDATE`, `ON CONFLICT`, `REPEATABLE READ` | [`docs/database-design.md`](docs/database-design.md), [`db/migration`](src/main/resources/db/migration) |
 | **Error handling**: sealed `DomainException` hierarchy, named exceptions (`InsufficientFundsException`, `AccountFrozenException`, `PaymentAlreadyCapturedException`, …), one `@RestControllerAdvice`, consistent error body with `traceId`, no stack traces leaked | [`docs/error-handling.md`](docs/error-handling.md), [`ApiExceptionHandler`](src/main/java/com/kgiannopoulou/ledgerforge/shared/web/ApiExceptionHandler.java) |
 | **Security**: Spring Security JWT resource server; `CUSTOMER` / `SUPPORT` / `AUDITOR` / `ADMIN`; role gates + per-resource ownership checks; tested over HTTP (Alice → Bob's account = 403) | [`docs/security.md`](docs/security.md), [`AuthorizationApiTest`](src/test/java/com/kgiannopoulou/ledgerforge/security/AuthorizationApiTest.java) |
-| **Audit trail**: append-only (`UPDATE`/`DELETE`/`TRUNCATE` rejected by triggers), written in the business transaction, with actor and trace id | [`docs/audit-trail.md`](docs/audit-trail.md), [`V7__audit_events.sql`](src/main/resources/db/migration/V7__audit_events.sql) |
+| **Audit trail**: append-only (`UPDATE`/`DELETE`/`TRUNCATE` rejected by triggers), written in the business transaction, with actor and trace id | [`docs/audit-trail.md`](docs/audit-trail.md), [`V008__create_audit_events.sql`](src/main/resources/db/migration/V008__create_audit_events.sql) |
 | **Events**: typed event records on a sealed interface; **transactional outbox** solves the dual write; Kafka consumers with retries, exponential backoff, DLT and **idempotent processing** | [`docs/outbox.md`](docs/outbox.md), [`events/`](src/test/java/com/kgiannopoulou/ledgerforge/events) |
 | **Architecture**: package-by-feature modular monolith, rules enforced by ArchUnit | [`ArchitectureTest`](src/test/java/com/kgiannopoulou/ledgerforge/architecture/ArchitectureTest.java), [ADRs](docs/decisions) |
 | **Operations**: Docker multi-stage layered image, Compose (PostgreSQL + Kafka KRaft), health probes, structured JSON logs, GitHub Actions CI | [`docker/Dockerfile`](docker/Dockerfile), [`compose.yaml`](compose.yaml), [`ci.yml`](.github/workflows/ci.yml) |
@@ -255,8 +255,8 @@ ledgerforge/
 ├── README.md
 ├── docs/
 │   ├── architecture.md · domain-model.md · concurrency.md · idempotency.md · ledger-invariants.md
-│   ├── error-handling.md · security.md · audit-trail.md · outbox.md
-│   └── decisions/                 ADR 0001–0012
+│   ├── error-handling.md · security.md · audit-trail.md · outbox.md · database-design.md
+│   └── decisions/                 ADR 0001–0013
 ├── src/main/java/com/kgiannopoulou/ledgerforge/
 │   ├── customer/ account/ ledger/ transfer/ payment/ idempotency/
 │   │     └── api/ application/ domain/ infrastructure/
@@ -267,7 +267,7 @@ ledgerforge/
 │   ├── risk/ webhook/             Kafka consumers
 │   ├── shared/                    Money, error hierarchy, integration events, transactions, web
 │   └── infrastructure/            cross-cutting config
-├── src/main/resources/db/migration/   Flyway V1–V9
+├── src/main/resources/db/migration/   Flyway V001–V010
 ├── src/test/java/…                unit · api · security · audit · outbox · events (Kafka) · concurrency · architecture
 ├── docker/Dockerfile
 ├── compose.yaml

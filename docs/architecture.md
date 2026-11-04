@@ -24,7 +24,7 @@ the service could later be split.
                                  │ JDBC        │ produce      │ consume
                                  ▼             ▼              │
   ┌────────────────────────────────────────┐  ┌─────────────────┴────────────┐
-  │ PostgreSQL 17 (Flyway V1..V9)          │  │ Kafka 4.1 (KRaft)            │
+  │ PostgreSQL 17 (Flyway V001..V010)     │  │ Kafka 4.1 (KRaft)            │
   │  customers, accounts (+ @Version)      │  │  ledgerforge.payments.v1     │
   │  ledger_transactions / ledger_entries  │  │  ledgerforge.transfers.v1    │
   │    (debits = credits, append-only)     │  │  ledgerforge.accounts.v1     │

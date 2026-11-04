@@ -18,3 +18,4 @@ context, decision, consequences.
 | [0010](0010-append-only-audit-in-the-business-transaction.md) | Append-only audit trail written in the business transaction | Accepted |
 | [0011](0011-transactional-outbox.md) | Transactional outbox for publishing events to Kafka | Accepted |
 | [0012](0012-idempotent-consumers-retries-and-dlt.md) | Idempotent consumers, retries with backoff, dead-letter topics | Accepted |
+| [0013](0013-migration-layout-and-rebaseline.md) | Migration layout, and a one-time re-baseline | Accepted |
