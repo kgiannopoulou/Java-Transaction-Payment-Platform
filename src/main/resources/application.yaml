@@ -94,6 +94,11 @@ management:
       # Health is public (probes); component details only for admins.
       show-details: when-authorized
       roles: ADMIN
+      group:
+        readiness:
+          # An instance that cannot reach PostgreSQL cannot do anything useful: take it out of rotation.
+          # Redis and Kafka are left out on purpose, because the service works without them.
+          include: readinessState,db
   metrics:
     distribution:
       # Histogram buckets, so Prometheus can compute p95 latency per endpoint.

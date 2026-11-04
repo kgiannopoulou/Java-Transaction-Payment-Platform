@@ -205,9 +205,9 @@ def kill_webhook_receiver():
     check(name, "Every attempt is stored", attempts and attempts[-1]["outcome"] == "SUCCESS"
           and all(a["outcome"] == "FAILURE" for a in attempts[:-1]),
           [f"{a['attemptNumber']}:{a['outcome']}" for a in attempts])
-    gaps = [(attempts[i + 1]["startedAt"], attempts[i]["startedAt"]) for i in range(len(attempts) - 1)]
     note(f"Attempt times: {[a['startedAt'] for a in attempts]}")
-    check(name, "The merchant got the event exactly once", len(received_for(payment)) == 1, len(gaps) + 1)
+    copies = len(received_for(payment))
+    check(name, "The merchant got the event exactly once", copies == 1, f"{copies} received")
 
 
 # ---- experiments 3 and 4 --------------------------------------------------------------------------
@@ -246,6 +246,8 @@ def crash_during_transfers(service, name):
         note(f"{before} transfers acknowledged, killing {service} mid-load")
         kill(service)
         time.sleep(3)
+        if service == "postgres":
+            check(name, "Readiness reports the instance as not ready while PostgreSQL is down", not healthy())
         start(service)
         wait_for(healthy, f"{service} is back and the service is ready", 180)
         time.sleep(2)

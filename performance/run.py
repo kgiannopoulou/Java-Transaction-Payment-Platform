@@ -59,14 +59,17 @@ class DockerStats(threading.Thread):
                     service = "k6"
                 if service:
                     self.samples.setdefault(service, []).append(
-                        (float(cpu.rstrip("%")), to_mib(memory.split("/")[0].strip())))
+                        (time.monotonic(), float(cpu.rstrip("%")), to_mib(memory.split("/")[0].strip())))
             time.sleep(2)
 
-    def summary(self):
-        return {service: {"cpu_avg_percent": round(statistics.mean(c for c, _ in values), 1),
-                          "cpu_max_percent": round(max(c for c, _ in values), 1),
-                          "memory_max_mib": round(max(m for _, m in values))}
-                for service, values in self.samples.items()}
+    def summary(self, seconds):
+        """Only the load phase: the last `seconds` before k6 ended, not its setup."""
+        since = time.monotonic() - seconds
+        recent = {s: [v for v in values if v[0] >= since] for s, values in self.samples.items()}
+        return {service: {"cpu_avg_percent": round(statistics.mean(c for _, c, _ in values), 1),
+                          "cpu_max_percent": round(max(c for _, c, _ in values), 1),
+                          "memory_max_mib": round(max(m for _, _, m in values))}
+                for service, values in recent.items() if values}
 
 
 def run_level(test, users, duration, network, out):
@@ -91,22 +94,25 @@ def measured(test, users, duration, network, out):
     stats.start()
     window, code = run_level(test, users, duration, network, out)
     stats.running = False
+    containers = stats.summary(window)
     time.sleep(6)  # one more Prometheus scrape
 
     summary = json.loads((out / f"{test}-{users}.json").read_text(encoding="utf-8"))
     metrics = summary["metrics"]
-    duration_ms = metrics["http_req_duration"]
-    failed = metrics.get("http_req_failed", {})
+    seconds = int(duration.rstrip("s"))
+    load = "{scenario:load}"
+    duration_ms = metrics["http_req_duration" + load]
+    failed = metrics["http_req_failed" + load]
+    requests = metrics["http_reqs" + load]["count"]
     span = f"[{window}s]"
     result = {
         "test": test,
         "users": users,
         "k6_exit_code": code,
-        "requests": metrics["http_reqs"]["count"],
-        "requests_per_second": round(metrics["http_reqs"]["rate"], 1),
-        "iterations_per_second": round(metrics["iterations"]["rate"], 1),
+        "requests": requests,
+        "requests_per_second": round(requests / seconds, 1),
         "latency_ms": {k: round(duration_ms[k], 1) for k in ("med", "p(95)", "p(99)", "max")},
-        "error_rate_percent": round(100 * failed.get("value", failed.get("rate", 0)), 3),
+        "error_rate_percent": round(100 * failed["value"], 3),
         "db_connections_active_max": prometheus(f"max_over_time(hikaricp_connections_active{span})"),
         "db_connections_pending_max": prometheus(f"max_over_time(hikaricp_connections_pending{span})"),
         "app_cpu_avg_percent_of_host": round(100 * (prometheus(f"avg_over_time(process_cpu_usage{span})") or 0), 1),
@@ -114,13 +120,22 @@ def measured(test, users, duration, network, out):
         "jvm_heap_max_mib": round((prometheus(f'max_over_time(sum(jvm_memory_used_bytes{{area="heap"}})[{window}s:5s])') or 0) / 1048576),
         "jvm_live_threads_max": prometheus(f"max_over_time(jvm_threads_live_threads{span})"),
         "outbox_pending_max": prometheus(f"max_over_time(outbox_pending_events{span})"),
-        "containers": stats.summary(),
+        "containers": containers,
     }
     if "payment_flow_duration" in metrics:
         flow = metrics["payment_flow_duration"]
         result["flow_latency_ms"] = {k: round(flow[k], 1) for k in ("med", "p(95)", "p(99)")}
+    result["outbox_drain_seconds"] = drain_outbox()
     print(json.dumps(result), flush=True)
     return result
+
+
+def drain_outbox(limit=600):
+    """Waits until the relay has caught up, so one level's backlog cannot affect the next."""
+    began = time.monotonic()
+    while (prometheus("outbox_pending_events") or 0) > 0 and time.monotonic() - began < limit:
+        time.sleep(5)
+    return round(time.monotonic() - began)
 
 
 def environment():
@@ -140,6 +155,14 @@ def environment():
     }
 
 
+def warm_up(network, out):
+    """JIT compilation and connection pools, so the first level does not measure a cold JVM."""
+    print("== warm-up (not measured)", flush=True)
+    run_level("transfer", 20, "30s", network, out)
+    run_level("payment", 20, "30s", network, out)
+    drain_outbox()
+
+
 def markdown(env, results, duration):
     lines = [f"Measured {env['date']} at commit `{env['commit']}`. {env['cpus']} vCPUs ({env['cpu_model']}), "
              f"{env['memory']} RAM, {env['os']}. Application, PostgreSQL, Kafka, Redis, Prometheus and k6 share this "
@@ -147,16 +170,18 @@ def markdown(env, results, duration):
     for test in sorted({r["test"] for r in results}, reverse=True):
         lines += [f"### {test}\n",
                   "| Users | Requests/s | p50 | p95 | p99 | Errors | DB connections (max active / max waiting) | "
-                  "App CPU | Heap max | Outbox max |",
-                  "|---|---|---|---|---|---|---|---|---|---|"]
+                  "App CPU | PostgreSQL CPU | Heap max | Outbox backlog | Backlog drained in |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for r in (r for r in results if r["test"] == test):
             latency = r["latency_ms"]
             app = r["containers"].get("app", {})
+            database = r["containers"].get("postgres", {})
             lines.append(
                 f"| {r['users']} | {r['requests_per_second']} | {latency['med']} ms | {latency['p(95)']} ms | "
                 f"{latency['p(99)']} ms | {r['error_rate_percent']}% | "
                 f"{r['db_connections_active_max']:.0f} / {r['db_connections_pending_max']:.0f} | "
-                f"{app.get('cpu_avg_percent', '?')}% | {r['jvm_heap_max_mib']} MiB | {r['outbox_pending_max']:.0f} |")
+                f"{app.get('cpu_avg_percent', '?')}% | {database.get('cpu_avg_percent', '?')}% | {r['jvm_heap_max_mib']} MiB | "
+                f"{r['outbox_pending_max']:.0f} | {r['outbox_drain_seconds']} s |")
         lines.append("")
     return "\n".join(lines)
 
@@ -175,11 +200,12 @@ def main():
     os.chmod(out, 0o777)  # k6 runs as a non-root user inside its container
     env = environment()
     results = []
+    warm_up(args.network, out)
     for test in args.tests.split(","):
         for users in (int(u) for u in args.users.split(",")):
             results.append(measured(test, users, args.duration, args.network, out))
             (out / "results.json").write_text(json.dumps({"environment": env, "results": results}, indent=2), encoding="utf-8")
-            time.sleep(20)  # let the outbox and consumers drain between levels
+            time.sleep(10)
     (out / "results.md").write_text(markdown(env, results, args.duration), encoding="utf-8")
     print(markdown(env, results, args.duration))
 

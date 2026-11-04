@@ -4,13 +4,14 @@
 //   k6 run -e USERS=100 -e DURATION=60s performance/transfer-load-test.js
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { API, DURATION, USERS, createWallets, headers, summaryTrendStats, thinkTime } from './lib/setup.js';
+import { API, DURATION, USERS, createWallets, headers, loadOnlyMetrics, summaryTrendStats, thinkTime } from './lib/setup.js';
 
 const WALLETS = 200;
 
 export const options = {
   scenarios: { load: { executor: 'constant-vus', vus: USERS, duration: DURATION } },
   summaryTrendStats,
+  thresholds: loadOnlyMetrics,
   setupTimeout: '10m',
 };
 

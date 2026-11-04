@@ -10,6 +10,14 @@ export const DURATION = __ENV.DURATION || '60s';
 // p50 is "med". Thresholds are deliberately absent: these tests measure, they do not pass or fail.
 export const summaryTrendStats = ['avg', 'min', 'med', 'p(95)', 'p(99)', 'max'];
 
+// Never fail, only force k6 to report these sub-metrics: measurements must exclude setup traffic,
+// which runs outside the "load" scenario.
+export const loadOnlyMetrics = {
+  'http_req_duration{scenario:load}': ['max>=0'],
+  'http_reqs{scenario:load}': ['count>=0'],
+  'http_req_failed{scenario:load}': ['rate>=0'],
+};
+
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 function post(path, body, token) {
