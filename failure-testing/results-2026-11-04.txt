@@ -1,0 +1,59 @@
+[    0.0s] Stack ready: after 0.0s
+[    0.0s] --- Kill Kafka
+[    1.5s] KILL kafka (SIGKILL)
+[    1.8s] PASS: Payment succeeds with Kafka down (HTTP 200)
+[    1.8s] PASS: Money moved (30.00)
+[    2.0s] PASS: Outbox retains the event (1 unpublished row)
+[   17.2s] PASS: Still retained after 15 s, with failed attempts recorded (attempts=2)
+[   17.2s] START kafka
+[   37.5s] Event published after Kafka returned: after 20.1s
+[   37.8s] PASS: Event published (20.1s after restart)
+[   38.3s] Webhook received: after 0.5s
+[   38.3s] PASS: The event went all the way through to the merchant, once (0.5s after publishing)
+[   38.3s] --- Kill webhook receiver
+[   38.4s] KILL receiver (SIGKILL)
+[   38.6s] PASS: The payment does not depend on the merchant's server (HTTP 200)
+[   39.2s] Delivery queued: after 0.5s
+[   53.5s] Two attempts failed, with backoff between them: after 14.3s
+[   53.5s] START receiver
+[   83.3s] Delivered after the receiver returned: after 29.6s
+[   83.3s] PASS: Webhook fails, retries, then delivery succeeds (3 attempts)
+[   83.3s] PASS: Every attempt is stored (['1:FAILURE', '2:FAILURE', '3:SUCCESS'])
+[   83.3s] Attempt times: ['2026-11-04T10:28:37.119398Z', '2026-11-04T10:28:49.140859Z', '2026-11-04T10:29:21.176019Z']
+[   83.3s] PASS: The merchant got the event exactly once (1 received)
+[   83.3s] --- Kill the application during transfers
+[   87.6s] 241 transfers acknowledged, killing app mid-load
+[   87.6s] KILL app (SIGKILL)
+[   91.0s] START app
+[  104.3s] app is back and the service is ready: after 12.5s
+[  106.4s] Clients saw 306 acknowledged, 0 refused, 632 in doubt
+[  106.4s] PASS: Clients really were cut off mid-request (632 requests with no answer)
+[  115.8s] PASS: Every in-doubt retry got a definite answer ([201, 422])
+[  115.9s] PASS: Nothing acknowledged was lost (902 of 902 present)
+[  116.0s] PASS: No missing money: the wallets still total EUR 4000.00 (4000.00)
+[  116.1s] PASS: No half-transfer: none left incomplete (0 incomplete)
+[  116.3s] PASS: No half-transfer: every ledger transaction has both legs (0 one-sided)
+[  116.4s] PASS: Every stored transfer was acknowledged: retries created no duplicates (902 stored, 902 acknowledged)
+[  116.4s] PASS: The whole ledger reconciles (True)
+[  116.4s] --- Kill PostgreSQL during transfers
+[  120.6s] 396 transfers acknowledged, killing postgres mid-load
+[  120.6s] KILL postgres (SIGKILL)
+[  127.2s] PASS: Readiness reports the instance as not ready while PostgreSQL is down 
+[  127.2s] START postgres
+[  128.5s] postgres is back and the service is ready: after 0.9s
+[  130.5s] Clients saw 623 acknowledged, 22 refused, 16 in doubt
+[  130.5s] PASS: Clients really were cut off mid-request (16 requests with no answer)
+[  130.7s] PASS: Every in-doubt retry got a definite answer ([201])
+[  130.8s] PASS: Nothing acknowledged was lost (639 of 639 present)
+[  130.9s] PASS: No missing money: the wallets still total EUR 4000.00 (4000.00)
+[  131.0s] PASS: No half-transfer: none left incomplete (0 incomplete)
+[  131.1s] PASS: No half-transfer: every ledger transaction has both legs (0 one-sided)
+[  131.2s] PASS: Every stored transfer was acknowledged: retries created no duplicates (639 stored, 639 acknowledged)
+[  131.3s] PASS: The whole ledger reconciles (True)
+[  131.3s] --- Kill Redis
+[  131.3s] KILL redis (SIGKILL)
+[  132.6s] PASS: Payments keep working without Redis (HTTP 200, 1.1s for the flow)
+[  132.6s] PASS: The balance is right (30.00)
+[  132.8s] PASS: The risk decision records that it ran without Redis (degraded=t)
+[  132.8s] START redis
+[  133.3s] Health is UP again: after 0.1s

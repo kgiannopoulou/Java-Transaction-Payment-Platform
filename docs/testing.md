@@ -102,6 +102,37 @@ jqwik prints its own seed and a shrunk counterexample.
 `Payment`, and `DomainPropertyTest` caught it at once with "refunds never exceed the payment".
 `NaiveLockingRaceTest` shows the same for concurrency: with unsafe locking, money really is created.
 
+## Continuous integration
+
+Every push and pull request runs these stages, each as its own step, so a red build says at once what
+kind of problem it is:
+
+```
+checkout → compile → Checkstyle → unit → integration → concurrency → end-to-end → package
+```
+
+| Stage | Tests (2026-11-04) |
+|-------|--------------------|
+| Unit | 165 |
+| Integration | 174 |
+| Concurrency | 17 |
+| End-to-end | 10 |
+
+Alongside them:
+
+| Check | Tool | Notes |
+|-------|------|-------|
+| Style | Checkstyle | rules that catch mistakes (unused imports, missing braces), not a formatting guide |
+| Coverage | JaCoCo | per-module table in each run's summary, and the HTML report as an artifact. 95.6% of lines and 84.5% of branches. No threshold is enforced, because a target rewards tests that prove nothing |
+| Image | Docker | the image builds |
+| Dependencies | CycloneDX SBOM + OSV-Scanner | fails the build on known vulnerabilities. The first scan found 6 in Kafka's compression libraries, now pinned to fixed versions |
+| Code | CodeQL | weekly and on every push, `security-extended` queries |
+| Updates | Dependabot | weekly pull requests |
+
+Load tests and failure experiments run from their own workflows ([`performance/`](../performance/README.md),
+[`failure-scenarios.md`](failure-scenarios.md)), since they take longer and their results are worth
+reading rather than gating on.
+
 ## Notes for writing tests
 
 - Tests never clean the database. The ledger is append-only by design, so each test creates its own

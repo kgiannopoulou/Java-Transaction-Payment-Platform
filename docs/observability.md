@@ -73,6 +73,9 @@ name, which is what dashboards and alerts use.
 | `/actuator/metrics` | ADMIN |
 | `/actuator/prometheus` | HTTP Basic, user `prometheus` |
 
+Readiness includes PostgreSQL, because an instance without it can do nothing useful. Kafka and Redis
+are left out on purpose: the service keeps working without them.
+
 Prometheus cannot present a short-lived JWT, so the scrape endpoint has its own small security chain
 with a dedicated user who can read that endpoint and nothing else. An admin token does not open it,
 and the scrape user cannot reach anything else (`MetricsApiTest`). The password comes from
