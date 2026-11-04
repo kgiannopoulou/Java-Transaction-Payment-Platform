@@ -6,9 +6,9 @@ import com.kgiannopoulou.ledgerforge.shared.event.IntegrationEvent;
 import com.kgiannopoulou.ledgerforge.shared.event.IntegrationEventCodec;
 import com.kgiannopoulou.ledgerforge.shared.event.PaymentCapturedEvent;
 import com.kgiannopoulou.ledgerforge.support.KafkaIntegrationTest;
-import com.kgiannopoulou.ledgerforge.support.RecordingWebhookSender;
+import com.kgiannopoulou.ledgerforge.support.FlakyWebhookEndpointRepository;
 import com.kgiannopoulou.ledgerforge.support.TopicProbe;
-import com.kgiannopoulou.ledgerforge.webhook.application.WebhookNotificationService;
+import com.kgiannopoulou.ledgerforge.webhook.application.WebhookFanOutService;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +42,7 @@ class ConsumerFailureHandlingKafkaTest extends KafkaIntegrationTest {
     IntegrationEventCodec codec;
 
     @Autowired
-    RecordingWebhookSender webhookSender;
+    FlakyWebhookEndpointRepository webhookEndpoints;
 
     @Autowired
     JdbcClient jdbc;
@@ -59,8 +59,7 @@ class ConsumerFailureHandlingKafkaTest extends KafkaIntegrationTest {
 
         awaitProcessedByBothConsumers(marker.eventId());
 
-        assertThat(webhookSender.attempts(captured.eventId())).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM webhook_deliveries WHERE event_id = ?", captured.eventId())).isEqualTo(1);
+        assertThat(webhookEndpoints.lookups(captured.merchantAccountId())).isEqualTo(1); // the copy was skipped before any work
         assertThat(count("SELECT count(*) FROM risk_alerts WHERE event_id = ?", captured.eventId())).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM processed_events WHERE event_id = ?", captured.eventId())).isEqualTo(2);
     }
@@ -68,21 +67,20 @@ class ConsumerFailureHandlingKafkaTest extends KafkaIntegrationTest {
     @Test
     void transientFailureIsRetriedWithBackoffAndSucceedsOnce() throws Exception {
         PaymentCapturedEvent captured = largeCapture(UUID.randomUUID());
-        webhookSender.failTimes(captured.eventId(), 2); // merchant endpoint down for two attempts
+        webhookEndpoints.failTimes(captured.merchantAccountId(), 2); // e.g. a database blip during fan-out
 
         send(captured);
 
         await().atMost(TIMEOUT).untilAsserted(() ->
-                assertThat(count("SELECT count(*) FROM webhook_deliveries WHERE event_id = ?", captured.eventId()))
-                        .isEqualTo(1));
-        assertThat(webhookSender.attempts(captured.eventId())).isEqualTo(3);
-        assertThat(webhookSender.successes(captured.eventId())).isEqualTo(1);
+                assertThat(count("SELECT count(*) FROM processed_events WHERE consumer = ? AND event_id = ?",
+                        WebhookFanOutService.CONSUMER, captured.eventId())).isEqualTo(1));
+        assertThat(webhookEndpoints.lookups(captured.merchantAccountId())).isEqualTo(3);
     }
 
     @Test
     void permanentFailureLandsOnTheDeadLetterTopicWithoutSideEffects() throws Exception {
         PaymentCapturedEvent captured = largeCapture(UUID.randomUUID());
-        webhookSender.failTimes(captured.eventId(), RecordingWebhookSender.FOREVER);
+        webhookEndpoints.failTimes(captured.merchantAccountId(), FlakyWebhookEndpointRepository.FOREVER);
 
         send(captured);
 
@@ -92,12 +90,11 @@ class ConsumerFailureHandlingKafkaTest extends KafkaIntegrationTest {
 
         assertThat(dead.value()).isEqualTo(codec.encode(captured)); // original payload, ready for replay
         assertThat(TopicProbe.header(dead, KafkaHeaders.DLT_ORIGINAL_TOPIC)).contains(EventTopics.PAYMENTS);
-        assertThat(webhookSender.attempts(captured.eventId())).isEqualTo(4); // 1 + 3 retries
-        assertThat(count("SELECT count(*) FROM webhook_deliveries WHERE event_id = ?", captured.eventId())).isZero();
+        assertThat(webhookEndpoints.lookups(captured.merchantAccountId())).isEqualTo(4); // 1 + 3 retries
         assertThat(count("SELECT count(*) FROM processed_events WHERE consumer = ? AND event_id = ?",
-                WebhookNotificationService.CONSUMER, captured.eventId())).isZero();
+                WebhookFanOutService.CONSUMER, captured.eventId())).isZero();
 
-        // Consumer groups are independent: the broken webhook endpoint did not stop risk scoring.
+        // Consumer groups are independent: the failing webhook consumer did not stop risk scoring.
         await().atMost(TIMEOUT).untilAsserted(() ->
                 assertThat(count("SELECT count(*) FROM risk_alerts WHERE event_id = ?", captured.eventId())).isEqualTo(1));
     }
@@ -138,7 +135,7 @@ class ConsumerFailureHandlingKafkaTest extends KafkaIntegrationTest {
         await().atMost(TIMEOUT).untilAsserted(() -> assertThat(jdbc.sql(
                         "SELECT consumer FROM processed_events WHERE event_id = ?").param(eventId)
                 .query(String.class).list())
-                .containsExactlyInAnyOrder(RiskAssessmentService.CONSUMER, WebhookNotificationService.CONSUMER));
+                .containsExactlyInAnyOrder(RiskAssessmentService.CONSUMER, WebhookFanOutService.CONSUMER));
     }
 
     private long count(String sql, Object... params) {

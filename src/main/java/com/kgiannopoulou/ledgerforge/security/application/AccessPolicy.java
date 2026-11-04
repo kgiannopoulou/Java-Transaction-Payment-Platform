@@ -5,6 +5,9 @@ import com.kgiannopoulou.ledgerforge.payment.domain.Payment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentRepository;
 import com.kgiannopoulou.ledgerforge.security.domain.Role;
 import com.kgiannopoulou.ledgerforge.transfer.domain.TransferRepository;
+import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookDeliveryRepository;
+import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookEndpoint;
+import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookEndpointRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,11 +33,16 @@ public class AccessPolicy {
     private final AccountRepository accounts;
     private final TransferRepository transfers;
     private final PaymentRepository payments;
+    private final WebhookEndpointRepository webhookEndpoints;
+    private final WebhookDeliveryRepository webhookDeliveries;
 
-    public AccessPolicy(AccountRepository accounts, TransferRepository transfers, PaymentRepository payments) {
+    public AccessPolicy(AccountRepository accounts, TransferRepository transfers, PaymentRepository payments,
+                        WebhookEndpointRepository webhookEndpoints, WebhookDeliveryRepository webhookDeliveries) {
         this.accounts = accounts;
         this.transfers = transfers;
         this.payments = payments;
+        this.webhookEndpoints = webhookEndpoints;
+        this.webhookDeliveries = webhookDeliveries;
     }
 
     // ---- customers ---------------------------------------------------------------------------
@@ -90,6 +98,24 @@ public class AccessPolicy {
     /** Cancel: either side may call off a payment that has not been captured. */
     public boolean isPaymentParticipant(UUID paymentId) {
         return isPayer(paymentId) || isMerchant(paymentId);
+    }
+
+    // ---- webhooks ----------------------------------------------------------------------------
+
+    public boolean canReadWebhookEndpoint(UUID endpointId) {
+        return CurrentPrincipal.hasAnyRole(Role.SUPPORT, Role.AUDITOR, Role.ADMIN) || ownsWebhookEndpoint(endpointId);
+    }
+
+    public boolean ownsWebhookEndpoint(UUID endpointId) {
+        return webhookEndpoints.findById(endpointId).map(WebhookEndpoint::accountId).map(this::ownsAccount).orElse(false);
+    }
+
+    public boolean canReadWebhookDelivery(UUID deliveryId) {
+        return CurrentPrincipal.hasAnyRole(Role.SUPPORT, Role.AUDITOR, Role.ADMIN) || ownsWebhookDelivery(deliveryId);
+    }
+
+    public boolean ownsWebhookDelivery(UUID deliveryId) {
+        return webhookDeliveries.findOwnerAccountId(deliveryId).map(this::ownsAccount).orElse(false);
     }
 
     private Optional<UUID> paymentAccount(UUID paymentId, Function<Payment, UUID> side) {

@@ -73,6 +73,10 @@ public final class ApiClient {
         return send(builder);
     }
 
+    public Response delete(String path) {
+        return send(HttpRequest.newBuilder(URI.create(baseUrl + path)).DELETE());
+    }
+
     public Response post(String path, Object body) {
         return post(path, body, null);
     }

@@ -64,6 +64,11 @@ class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/transfers", "/api/v1/payments", "/api/v1/payments/**")
                         .hasRole(CUSTOMER)
 
+                        // webhook configuration belongs to the account holder
+                        .requestMatchers(HttpMethod.POST, "/api/v1/webhook-endpoints", "/api/v1/webhook-deliveries/*/retry")
+                        .hasRole(CUSTOMER)
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/webhook-endpoints/*").hasRole(CUSTOMER)
+
                         // back-office reads
                         .requestMatchers(HttpMethod.GET, "/api/v1/ledger/**").hasAnyRole(SUPPORT, AUDITOR, ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/v1/risk/**").hasAnyRole(SUPPORT, AUDITOR, ADMIN)

@@ -5,5 +5,6 @@ public enum AuditedEntity {
     CUSTOMER,
     ACCOUNT,
     TRANSFER,
-    PAYMENT
+    PAYMENT,
+    WEBHOOK_ENDPOINT
 }

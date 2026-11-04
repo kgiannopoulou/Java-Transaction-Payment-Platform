@@ -7,11 +7,15 @@ import com.kgiannopoulou.ledgerforge.shared.event.IntegrationEventCodec;
 import com.kgiannopoulou.ledgerforge.shared.event.TransferCompletedEvent;
 import com.kgiannopoulou.ledgerforge.support.KafkaIntegrationTest;
 import com.kgiannopoulou.ledgerforge.support.TopicProbe;
+import com.kgiannopoulou.ledgerforge.support.WebhookReceiverStub;
+import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookSignature;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,6 +35,8 @@ class EventPipelineKafkaTest extends KafkaIntegrationTest {
 
     @Autowired
     IntegrationEventCodec codec;
+
+    private final WebhookReceiverStub receiver = new WebhookReceiverStub();
 
     @Test
     void completedTransferIsRelayedToKafkaKeyedByTransferWithTypeHeaders() {
@@ -71,19 +77,31 @@ class EventPipelineKafkaTest extends KafkaIntegrationTest {
     }
 
     @Test
-    void captureAndRefundNotifyTheMerchantOnceEach() {
+    void captureAndRefundReachTheMerchantsEndpointSignedAndOnceEach() {
         UUID payer = newFundedWallet("EUR", "100.00");
         UUID merchant = newWallet("EUR");
+        var registered = asOwnerOf(merchant).post("/api/v1/webhook-endpoints", Map.of(
+                "accountId", merchant, "url", receiver.url(),
+                "eventTypes", List.of("payment.captured", "payment.refunded")));
+        assertThat(registered.status()).as(registered.body().toString()).isEqualTo(201);
         UUID payment = newPayment(payer, merchant, "30.00", "EUR");
         asOwnerOf(payer).post("/api/v1/payments/" + payment + "/authorize", null);
         asOwnerOf(merchant).post("/api/v1/payments/" + payment + "/capture", null);
         asOwnerOf(merchant).post("/api/v1/payments/" + payment + "/refund", Map.of("amount", "30.00", "currency", "EUR"));
 
-        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(jdbc.sql("""
-                        SELECT event_type FROM webhook_deliveries WHERE payment_id = ? ORDER BY delivered_at""")
-                .param(payment).query(String.class).list())
-                .containsExactly("PaymentCaptured", "PaymentRefunded"));
-        assertThat(jdbc.sql("SELECT DISTINCT merchant_account_id FROM webhook_deliveries WHERE payment_id = ?")
-                .param(payment).query(UUID.class).list()).containsExactly(merchant);
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(receiver.received()).hasSize(2));
+
+        assertThat(receiver.received()).extracting(r -> r.json().get("type"))
+                .containsExactlyInAnyOrder("payment.captured", "payment.refunded");
+        assertThat(receiver.received()).allSatisfy(request -> {
+            assertThat(WebhookSignature.verify(registered.string("secret"), request.signature(), request.body(),
+                    Instant.now(), Duration.ofMinutes(5))).isTrue();
+            assertThat(request.json().get("data").toString()).contains(payment.toString());
+        });
+    }
+
+    @AfterEach
+    void stopReceiver() {
+        receiver.close();
     }
 }

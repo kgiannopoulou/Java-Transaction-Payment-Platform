@@ -8,7 +8,7 @@ import org.testcontainers.kafka.KafkaContainer;
 /**
  * {@link ApiTestSupport} with the whole event pipeline running: shared PostgreSQL, a real Kafka
  * broker (KRaft, single node), the outbox relay polling every 100 ms, the risk and webhook
- * consumers, and short retry backoffs so failure tests finish quickly.
+ * consumers, the webhook dispatcher, and short retry backoffs so failure tests finish quickly.
  */
 @Import(KafkaTestConfiguration.class)
 public abstract class KafkaIntegrationTest extends ApiTestSupport {
@@ -29,6 +29,8 @@ public abstract class KafkaIntegrationTest extends ApiTestSupport {
         registry.add("ledgerforge.outbox.relay.enabled", () -> "true");
         registry.add("ledgerforge.outbox.relay.poll-interval-ms", () -> "100");
         registry.add("ledgerforge.kafka.consumers.enabled", () -> "true");
+        registry.add("ledgerforge.webhooks.dispatcher.enabled", () -> "true");
+        registry.add("ledgerforge.webhooks.dispatcher.poll-interval-ms", () -> "100");
         registry.add("ledgerforge.kafka.retry.initial-interval", () -> "100ms");
         registry.add("ledgerforge.kafka.retry.max-interval", () -> "400ms");
         registry.add("ledgerforge.kafka.retry.max-retries", () -> "3");

@@ -37,6 +37,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         "server.tomcat.accept-count=1000",
         "ledgerforge.outbox.relay.enabled=false",
         "ledgerforge.kafka.consumers.enabled=false",
+        "ledgerforge.webhooks.dispatcher.enabled=false",
+        "ledgerforge.webhooks.allow-insecure-urls=true",
+        "ledgerforge.webhooks.request-timeout=1s",
         "spring.kafka.admin.auto-create=false"
 })
 public abstract class ApiTestSupport {

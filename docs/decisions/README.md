@@ -19,3 +19,4 @@ context, decision, consequences.
 | [0011](0011-transactional-outbox.md) | Transactional outbox for publishing events to Kafka | Accepted |
 | [0012](0012-idempotent-consumers-retries-and-dlt.md) | Idempotent consumers, retries with backoff, dead-letter topics | Accepted |
 | [0013](0013-migration-layout-and-rebaseline.md) | Migration layout, and a one-time re-baseline | Accepted |
+| [0014](0014-webhook-delivery-state-machine.md) | Webhook delivery as a state machine in PostgreSQL | Accepted |

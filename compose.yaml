@@ -62,6 +62,7 @@ services:
       LEDGERFORGE_DB_PASSWORD: ledgerforge
       LEDGERFORGE_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LEDGERFORGE_DEV_TOKENS: "true"
+      LEDGERFORGE_WEBHOOKS_ALLOW_INSECURE_URLS: "true"   # receivers on the local network
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs   # one JSON object per log line
     ports:
       - "8080:8080"

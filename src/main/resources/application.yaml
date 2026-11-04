@@ -122,3 +122,21 @@ ledgerforge:
       replication-factor: 1
   risk:
     large-amount-threshold: 10000.00
+  webhooks:
+    # Encrypts signing secrets at rest. Dev default only: real deployments inject
+    # LEDGERFORGE_WEBHOOK_ENCRYPTION_KEY from a secret store.
+    encryption-key: ${LEDGERFORGE_WEBHOOK_ENCRYPTION_KEY:dev-only-webhook-key-change-me}
+    # Allows http:// and private addresses. Local development and tests only (SSRF risk).
+    allow-insecure-urls: ${LEDGERFORGE_WEBHOOKS_ALLOW_INSECURE_URLS:false}
+    max-endpoints-per-account: 10
+    connect-timeout: 2s
+    request-timeout: 5s
+    # Wait after each failed attempt. Six attempts over ~1h13m, then the delivery is DEAD.
+    retry-schedule: 10s, 30s, 2m, 10m, 1h
+    dispatcher:
+      enabled: true
+      poll-interval-ms: 1000
+      batch-size: 500
+      max-in-flight: 500
+      mode: VIRTUAL   # VIRTUAL or PLATFORM, see docs/virtual-threads.md
+      platform-pool-size: 50

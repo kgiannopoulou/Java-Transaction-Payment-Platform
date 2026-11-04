@@ -1,5 +1,7 @@
 package com.kgiannopoulou.ledgerforge.support;
 
+import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookEndpointRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -9,7 +11,8 @@ public class KafkaTestConfiguration {
 
     @Bean
     @Primary
-    RecordingWebhookSender recordingWebhookSender() {
-        return new RecordingWebhookSender();
+    FlakyWebhookEndpointRepository flakyWebhookEndpoints(
+            @Qualifier("jdbcWebhookEndpointRepository") WebhookEndpointRepository real) {
+        return new FlakyWebhookEndpointRepository(real);
     }
 }

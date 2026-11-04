@@ -28,4 +28,5 @@ permanently. Some records can never be processed (malformed payloads).
   consumers; a non-blocking retry-topic chain would be the next step if a consumer's
   dependency were slow for long periods.
 - External side effects (webhooks) remain at-least-once. Receivers deduplicate on the
-  `eventId` we send.
+  event id we send. Retrying those calls later moved out of the consumer: see
+  [ADR 0014](0014-webhook-delivery-state-machine.md).

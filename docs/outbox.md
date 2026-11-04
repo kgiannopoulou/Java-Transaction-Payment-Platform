@@ -7,8 +7,8 @@ systems need to react to**:
 
 | Event | Topic | Consumers |
 |-------|-------|-----------|
-| `PaymentCaptured` | `ledgerforge.payments.v1` | risk engine, merchant webhooks |
-| `PaymentRefunded` | `ledgerforge.payments.v1` | merchant webhooks |
+| `PaymentCaptured` | `ledgerforge.payments.v1` | risk engine, webhook fan-out |
+| `PaymentRefunded` | `ledgerforge.payments.v1` | webhook fan-out |
 | `TransferCompleted` | `ledgerforge.transfers.v1` | risk engine |
 | `AccountFrozen` | `ledgerforge.accounts.v1` | (published for downstream systems) |
 
@@ -17,7 +17,7 @@ PaymentService / TransferService / AccountService
         │  (same DB transaction)
         ▼
   outbox_events ──► OutboxRelay ──► Kafka ──┬──► Risk engine      → risk_alerts
-                                            └──► Merchant webhooks → webhook_deliveries
+                                            └──► Webhook fan-out → webhook_deliveries
 ```
 
 Events are **strongly typed records** implementing a sealed interface:
@@ -105,7 +105,7 @@ record ──► listener ── fails ──► retry in place: 500 ms, 1 s, 2 
   which is **not retryable** and goes straight to the DLT.
 - DLT records keep the original payload and `eventId`, so they can be replayed after a fix.
   Because consumers are idempotent, replaying is always safe.
-- Consumer groups are independent: a broken webhook endpoint does not delay risk scoring.
+- Consumer groups are independent: a failing webhook consumer does not delay risk scoring.
 
 ### Idempotent consumers
 
@@ -117,17 +117,17 @@ handled event ids **in the same database transaction as its side effects**:
 BEGIN
   INSERT INTO processed_events (consumer, event_id) VALUES (…) ON CONFLICT DO NOTHING
   -- 0 rows → duplicate → skip
-  -- 1 row  → do the work (insert risk alert / send webhook + record delivery)
+  -- 1 row  → do the work (insert risk alert / insert webhook deliveries)
 COMMIT     -- marker and effects together; on failure both roll back and the retry starts clean
 ```
 
-`webhook_deliveries.event_id` and `risk_alerts (event_id, rule)` are additionally `UNIQUE`, as
-a second line of defence. Duplicates are counted in `ledgerforge.events.duplicates{consumer}`.
+`webhook_deliveries (endpoint_id, event_id)` and `risk_alerts (event_id, rule)` are additionally
+`UNIQUE`, as a second line of defence. Duplicates are counted in
+`ledgerforge.events.duplicates{consumer}`.
 
-Webhooks are still **at-least-once towards the merchant**. If the HTTP call succeeds and the
-commit then fails, the merchant gets it again on retry. Exactly-once delivery to an external
-endpoint is impossible. The notification carries `eventId` so the merchant can deduplicate,
-which is the standard contract (Stripe, Adyen, …).
+The webhook consumer makes no HTTP calls. It only records what has to be delivered, and a separate
+dispatcher owns retries towards customers, so a merchant's outage cannot stall a partition. Delivery
+to the merchant is at-least-once. See [webhooks.md](webhooks.md).
 
 ## Tests
 
@@ -135,5 +135,5 @@ which is the standard contract (Stripe, Adyen, …).
 |------|--------|
 | `TransactionalOutboxTest` | transfer, capture, refund, freeze each commit their event row in the business transaction; a rejected transfer writes none; publishing without a transaction throws |
 | `OutboxRelayTest` | order across batches; failed send → backoff, retried later, no overtaking within an aggregate; a stuck aggregate does not block others; backoff cap; retention purge |
-| `EventPipelineKafkaTest` | REST transfer → outbox → real Kafka (key, `eventType`/`eventId` headers) → row marked published; a large transfer raises exactly one risk alert; capture + refund notify the merchant once each |
-| `ConsumerFailureHandlingKafkaTest` | the same `PaymentCaptured` delivered twice → **one** webhook, one delivery row, one risk alert; endpoint down twice → retried with backoff, delivered once; endpoint down for good → 1 + 3 attempts, then the DLT with the original payload, no side effects, risk scoring unaffected; malformed record → DLT without retries |
+| `EventPipelineKafkaTest` | REST transfer → outbox → real Kafka (key, `eventType`/`eventId` headers) → row marked published; a large transfer raises exactly one risk alert; capture + refund reach the merchant's HTTP endpoint, signed, once each |
+| `ConsumerFailureHandlingKafkaTest` | the same `PaymentCaptured` delivered twice → processed once, one risk alert; consumer failing twice → retried with backoff, processed once; failing for good → 1 + 3 attempts, then the DLT with the original payload, no side effects, risk scoring unaffected; malformed record → DLT without retries |
