@@ -1,0 +1,6 @@
+target/
+.git/
+.jqwik-database
+docs/
+docker/grafana/
+docker/prometheus/

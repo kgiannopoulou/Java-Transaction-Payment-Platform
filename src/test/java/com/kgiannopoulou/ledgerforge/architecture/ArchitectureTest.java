@@ -6,6 +6,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.library.GeneralCodingRules;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -83,6 +84,14 @@ class ArchitectureTest {
     static final ArchRule redis_stays_behind_the_port =
             noClasses().that().resideOutsideOfPackage(ROOT + ".infrastructure..")
                     .should().dependOnClassesThat().resideInAPackage("org.springframework.data.redis..");
+
+    @ArchTest
+    static final ArchRule logging_goes_through_slf4j =
+            GeneralCodingRules.NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS
+                    .because("System.out skips structured logging, levels and the trace id");
+
+    @ArchTest
+    static final ArchRule no_java_util_logging = GeneralCodingRules.NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING;
 
     @ArchTest
     static final ArchRule no_floating_point_money =

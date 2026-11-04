@@ -3,7 +3,10 @@ package com.kgiannopoulou.ledgerforge.risk.infrastructure;
 import com.kgiannopoulou.ledgerforge.messaging.infrastructure.ConsumedEvents;
 import com.kgiannopoulou.ledgerforge.risk.application.RiskAssessmentService;
 import com.kgiannopoulou.ledgerforge.shared.event.EventTopics;
+import com.kgiannopoulou.ledgerforge.shared.event.IntegrationEvent;
+import com.kgiannopoulou.ledgerforge.shared.web.LogContext;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +26,9 @@ class RiskEventListener {
             topics = {EventTopics.TRANSFERS, EventTopics.PAYMENTS},
             autoStartup = "${ledgerforge.kafka.consumers.enabled:true}")
     void on(ConsumerRecord<String, String> record) {
-        riskAssessment.assess(events.decode(record));
+        IntegrationEvent event = events.decode(record);
+        try (var eventId = MDC.putCloseable(LogContext.EVENT_ID, event.eventId().toString())) {
+            riskAssessment.assess(event);
+        }
     }
 }

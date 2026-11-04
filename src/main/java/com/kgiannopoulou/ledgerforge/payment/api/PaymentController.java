@@ -3,6 +3,7 @@ package com.kgiannopoulou.ledgerforge.payment.api;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.kgiannopoulou.ledgerforge.idempotency.api.IdempotencyHeaders;
 import com.kgiannopoulou.ledgerforge.idempotency.application.IdempotentOperations;
+import com.kgiannopoulou.ledgerforge.payment.application.PaymentMetrics;
 import com.kgiannopoulou.ledgerforge.payment.application.PaymentService;
 import com.kgiannopoulou.ledgerforge.payment.application.PaymentService.CreatePaymentCommand;
 import com.kgiannopoulou.ledgerforge.account.domain.InsufficientFundsException;
@@ -15,6 +16,7 @@ import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.RefundPayment
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.ReviewPayment;
 import com.kgiannopoulou.ledgerforge.ratelimit.application.RateLimiter;
 import com.kgiannopoulou.ledgerforge.risk.application.RiskSignals;
+import com.kgiannopoulou.ledgerforge.shared.error.DomainException;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -37,13 +39,15 @@ class PaymentController {
     private final IdempotentOperations idempotent;
     private final RateLimiter rateLimiter;
     private final RiskSignals riskSignals;
+    private final PaymentMetrics metrics;
 
     PaymentController(PaymentService paymentService, IdempotentOperations idempotent, RateLimiter rateLimiter,
-                      RiskSignals riskSignals) {
+                      RiskSignals riskSignals, PaymentMetrics metrics) {
         this.paymentService = paymentService;
         this.idempotent = idempotent;
         this.rateLimiter = rateLimiter;
         this.riskSignals = riskSignals;
+        this.metrics = metrics;
     }
 
     @PostMapping
@@ -58,11 +62,18 @@ class PaymentController {
         try {
             var result = idempotent.execute("payment.create", idempotencyKey, request, PaymentResponse.class,
                     HttpStatus.CREATED.value(), () -> PaymentResponse.from(paymentService.create(command)));
+            if (!result.replayed()) {
+                metrics.created();
+            }
             return IdempotencyHeaders.respond(result);
         } catch (PaymentBlockedException e) {
             // Here rather than in the service: the transaction has rolled back by now, so the
             // record of the refusal survives. No database locks or connections are held either.
             paymentService.recordBlocked(e.screened());
+            metrics.failed("create", e.type());
+            throw e;
+        } catch (RuntimeException e) {
+            metrics.failed("create", failureReason(e));
             throw e;
         }
     }
@@ -124,8 +135,17 @@ class PaymentController {
 
     /** The command record itself (payment id + amount) is the idempotency fingerprint. */
     private ResponseEntity<PaymentResponse> handle(String scope, String idempotencyKey, PaymentCommand command) {
-        var result = idempotent.execute(scope, idempotencyKey, command, PaymentResponse.class,
-                HttpStatus.OK.value(), () -> PaymentResponse.from(paymentService.handle(command)));
-        return IdempotencyHeaders.respond(result);
+        try {
+            var result = idempotent.execute(scope, idempotencyKey, command, PaymentResponse.class,
+                    HttpStatus.OK.value(), () -> PaymentResponse.from(paymentService.handle(command)));
+            return IdempotencyHeaders.respond(result);
+        } catch (RuntimeException e) {
+            metrics.failed(scope.substring(scope.indexOf('.') + 1), failureReason(e));
+            throw e;
+        }
+    }
+
+    private static String failureReason(RuntimeException e) {
+        return e instanceof DomainException domain ? domain.type() : "INTERNAL_ERROR";
     }
 }

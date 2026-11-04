@@ -1,0 +1,37 @@
+groups:
+  - name: ledgerforge
+    rules:
+      - alert: LedgerForgeDown
+        expr: up{job="ledgerforge"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: LedgerForge cannot be scraped
+
+      - alert: OutboxBacklogGrowing
+        expr: outbox_pending_events > 100 and deriv(outbox_pending_events[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Events are not reaching Kafka. No money is at risk, but consumers are falling behind.
+
+      - alert: PaymentFailureRateHigh
+        expr: |
+          sum(rate(payments_failed_total{operation="create"}[5m]))
+            / (sum(rate(payments_failed_total{operation="create"}[5m])) + sum(rate(payments_created_total[5m])))
+            > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 20% of new payments are being refused.
+
+      - alert: WebhookFailuresHigh
+        expr: sum(rate(webhook_failures_total[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Webhook attempts are failing steadily.

@@ -10,7 +10,13 @@ append-only audit trail, and every business event reaches Kafka through a transa
 consumed by idempotent consumers with retries and dead-letter topics. Payments pass a rule-based
 risk engine and per-account rate limits, and customers receive signed webhooks with retries and a
 full delivery history. Each of those claims is backed by tests against real PostgreSQL, Kafka and
-Redis.
+Redis, and one command starts the whole platform with Prometheus and Grafana:
+
+```bash
+docker compose --profile demo up    # then open http://localhost:3002
+```
+
+![LedgerForge Grafana dashboard](docs/images/grafana-dashboard.png)
 
 [![CI](https://github.com/kgiannopoulou/Java-Transaction-Payment-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/kgiannopoulou/Java-Transaction-Payment-Platform/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-blue)
@@ -42,8 +48,11 @@ Redis.
 | **Webhooks**: HMAC-signed, 10 s → 30 s → 2 min backoff, whole-request timeout, every attempt stored in an append-only table, dead-letter state with replay, `SKIP LOCKED` dispatcher, SSRF protection, secrets encrypted at rest | [`docs/webhooks.md`](docs/webhooks.md), [`WebhookDispatcher`](src/main/java/com/kgiannopoulou/ledgerforge/webhook/application/WebhookDispatcher.java) |
 | **Redis, with a reason**: atomic sliding-window rate limits (429 + `Retry-After`), distributed counters, temporary risk signals, a cache of immutable data. No balances: ArchUnit keeps the financial core away from it, and a test kills Redis mid-payment | [`docs/redis.md`](docs/redis.md), [`RedisOutageTest`](src/test/java/com/kgiannopoulou/ledgerforge/redis/RedisOutageTest.java) |
 | **Risk engine**: `RiskRule` interface, polymorphic rules injected by Spring, ALLOW / REVIEW / BLOCK, a review workflow, every decision stored and explainable | [`docs/risk-engine.md`](docs/risk-engine.md), [`rules/`](src/main/java/com/kgiannopoulou/ledgerforge/risk/application/rules) |
+| **Testing**: unit, integration and end-to-end tiers on real PostgreSQL, Kafka and Redis, plus property tests: thousands of random transfers among four €1000 wallets, and the total is always €4000 | [`docs/testing.md`](docs/testing.md), [`property/`](src/test/java/com/kgiannopoulou/ledgerforge/property) |
+| **Observability**: Prometheus metrics, a provisioned Grafana dashboard (throughput, success rate, p95 latency, failures, Kafka lag, outbox backlog), alert rules, health probes | [`docs/observability.md`](docs/observability.md), [`docker/grafana`](docker/grafana) |
+| **Logging**: structured JSON with `traceId`, `customerId`, `paymentId`, `transferId`; tests read real log events to prove that tokens, secrets and personal data stay out | [`docs/logging.md`](docs/logging.md), [`StructuredLoggingTest`](src/test/java/com/kgiannopoulou/ledgerforge/observability/StructuredLoggingTest.java) |
 | **Architecture**: package-by-feature modular monolith, rules enforced by ArchUnit | [`ArchitectureTest`](src/test/java/com/kgiannopoulou/ledgerforge/architecture/ArchitectureTest.java), [ADRs](docs/decisions) |
-| **Operations**: Docker multi-stage layered image, Compose (PostgreSQL + Kafka KRaft + Redis), health probes, structured JSON logs, GitHub Actions CI | [`docker/Dockerfile`](docker/Dockerfile), [`compose.yaml`](compose.yaml), [`ci.yml`](.github/workflows/ci.yml) |
+| **Operations**: Docker multi-stage layered image, one-command Compose stack (PostgreSQL, Kafka KRaft, Redis, Prometheus, Grafana), health probes, structured JSON logs, GitHub Actions CI | [`docker/Dockerfile`](docker/Dockerfile), [`compose.yaml`](compose.yaml), [`ci.yml`](.github/workflows/ci.yml) |
 
 ## The headline result
 
@@ -78,6 +87,9 @@ The event pipeline is tested the same way, by staging failures on a real broker:
 | 150 concurrent payments on one account | exactly **100** pass the rate limit, 50 get `429` |
 | 30 concurrent attempts on one account | exactly **19** allowed, 11 blocked |
 | Redis killed during a payment flow | payments still work, balances correct, ledger reconciles |
+| Kafka down during transfers | the API keeps working; after recovery every event is delivered, in order |
+| Relay crashes after Kafka's ack | the event is sent again with the same id, never lost |
+| 5,000 random concurrent transfers, 4 wallets, €4000 | total is exactly **€4000.00**, no wallet negative |
 
 ## Architecture
 
@@ -131,19 +143,43 @@ balances, idempotency key, audit event and outbox event.
 
 ## Quick start
 
-Requirements: **JDK 21** and **Docker**.
+Requirement: **Docker**. Nothing else needs installing.
 
 ```bash
-# Run everything in containers (PostgreSQL, Kafka, Redis, app; dev tokens enabled)
-docker compose up --build                  # API on http://localhost:8080
+docker compose up                # the whole platform
+docker compose --profile demo up # the same, plus generated traffic so the dashboards have data
+```
 
-# …or run the app locally against the Compose infrastructure
-docker compose up -d postgres kafka redis  # PostgreSQL on :5437, Kafka on :9094, Redis on :6381
+The first start builds the image and takes a few minutes.
+
+| Service | Address | |
+|---------|---------|---|
+| **LedgerForge API** | <http://localhost:8080> | dev tokens enabled, see the walkthrough below |
+| **Grafana** | <http://localhost:3002> | opens on the dashboard, no login |
+| **Prometheus** | <http://localhost:9091> | |
+| PostgreSQL | `localhost:5437` | user and password `ledgerforge` |
+| Kafka | `localhost:9094` | |
+| Redis | `localhost:6382` | |
+
+If a port is taken: `LEDGERFORGE_HTTP_PORT`, `LEDGERFORGE_GRAFANA_PORT` and `LEDGERFORGE_PROMETHEUS_PORT`
+change the first three. `docker compose down -v` removes everything.
+
+These settings are for a local demo: dev tokens, plain HTTP webhooks, anonymous Grafana and a
+fixed metrics password must never reach a real deployment.
+
+For development (needs **JDK 21**):
+
+```bash
+# Run the app locally against the Compose infrastructure
+docker compose up -d postgres kafka redis  # PostgreSQL on :5437, Kafka on :9094, Redis on :6382
 LEDGERFORGE_DEV_TOKENS=true ./mvnw spring-boot:run
 
 # Full test suite (unit, integration, security, concurrency, Kafka, Redis, architecture).
 # Needs Docker for Testcontainers (PostgreSQL 17, Kafka 4.1, Redis 7).
 ./mvnw verify
+
+# Just the unit tier: seconds, no Docker
+./mvnw test -DexcludedGroups=integration
 ```
 
 > The migrations were reorganised once, before any deployment ([ADR 0013](docs/decisions/0013-migration-layout-and-rebaseline.md)).
@@ -276,6 +312,25 @@ Every error, whether it comes from the domain, validation or the framework, has 
 every server log line for that request. Unexpected failures return a generic `500 INTERNAL_ERROR`;
 stack traces are logged, never returned. Full catalogue: [`docs/error-handling.md`](docs/error-handling.md).
 
+## Logging and security decisions
+
+Logs are structured JSON through SLF4J, and `ArchitectureTest` rejects `System.out`. Every line of a
+request carries `traceId`, `customerId`, `paymentId` or `transferId`, so one query follows a payment,
+and the `traceId` in an error response leads straight to its log lines.
+
+The rule is **log identifiers, not data**:
+
+| Never logged | Why |
+|--------------|-----|
+| Passwords, JWTs, `Authorization` headers | a logged token is a working credential |
+| Webhook secrets, encryption keys | they would allow forged webhooks |
+| Names, emails | personal data, and logs are kept and copied widely |
+| Amounts, request and response bodies | not needed routinely; the ledger and audit trail hold them, under access control |
+
+This is tested, not assumed: `StructuredLoggingTest` reads real log events at DEBUG level. Writing it
+turned up a real leak, because PostgreSQL's `Detail:` line had been copying customer emails into the
+logs. Details in [`docs/logging.md`](docs/logging.md).
+
 ## Tests
 
 `./mvnw verify` runs **309 tests** against real PostgreSQL 17, Kafka 4.1 and Redis 7 via Testcontainers:
@@ -295,6 +350,10 @@ stack traces are logged, never returned. Full catalogue: [`docs/error-handling.m
 | `RedisOutageTest` | kills Redis mid-test: the money path keeps working and balances reconcile |
 | `RiskEngineTest`, `RiskScreeningApiTest` | the decision table with boundary values; review workflow; refusals reveal nothing; replays are not attempts; exact counts under concurrency |
 | `DatabaseConstraintsTest` | raw SQL that skips Java cannot store invalid rows: amounts, currencies, refund/status mismatches, duplicates; every table has a primary key; all money is `NUMERIC(19,4)` |
+| `PaymentJourneyE2ETest` | whole journeys, HTTP in and signed webhook out, through every real component |
+| `MoneyConservationPropertyTest`, `PaymentConservationPropertyTest`, `DomainPropertyTest` | random traffic: the total is always €4000, every balance matches a simple model, no command sequence breaks a payment |
+| `OutboxRecoveryTest` | broker outage and crash recovery: nothing lost, order kept, no double sends between relays |
+| `MetricsApiTest`, `StructuredLoggingTest` | the agreed metrics exist and count correctly; scrape access is locked down; logs carry context and never secrets |
 | `IdempotencyApiTest` | replay, 409 on body mismatch, failure releases the key, scoping |
 | `PessimisticLockingConcurrencyTest` | conservation over 500 concurrent transfers, double-spend, deadlock-freedom, retry storm, concurrent captures, whole-ledger reconciliation |
 | `OptimisticLockingConcurrencyTest` | same guarantees via `@Version` + retries |
@@ -309,8 +368,8 @@ ledgerforge/
 ├── docs/
 │   ├── architecture.md · domain-model.md · concurrency.md · idempotency.md · ledger-invariants.md
 │   ├── error-handling.md · security.md · audit-trail.md · outbox.md · database-design.md
-│   ├── webhooks.md · redis.md · risk-engine.md
-│   └── decisions/                 ADR 0001–0016
+│   ├── webhooks.md · redis.md · risk-engine.md · testing.md · observability.md · logging.md
+│   └── decisions/                 ADR 0001–0017
 ├── src/main/java/com/kgiannopoulou/ledgerforge/
 │   ├── customer/ account/ ledger/ transfer/ payment/ idempotency/
 │   │     └── api/ application/ domain/ infrastructure/
@@ -325,7 +384,7 @@ ledgerforge/
 │   └── infrastructure/            cross-cutting config, Redis adapter
 ├── src/main/resources/db/migration/   Flyway V001–V012
 ├── src/test/java/…                unit · api · security · audit · outbox · events (Kafka) · webhook · redis · risk · concurrency · architecture
-├── docker/Dockerfile
+├── docker/                        Dockerfile, Prometheus, Grafana, demo traffic
 ├── compose.yaml
 └── .github/workflows/ci.yml
 ```
@@ -340,7 +399,8 @@ ledgerforge/
 | `ledgerforge.idempotency.ttl` | `24h` | how long keys are replayed |
 | `LEDGERFORGE_DB_URL` / `_USER` / `_PASSWORD` | `localhost:5437` | |
 | `LEDGERFORGE_KAFKA_BOOTSTRAP_SERVERS` | `localhost:9094` | |
-| `LEDGERFORGE_REDIS_HOST` / `_PORT` | `localhost:6381` | |
+| `LEDGERFORGE_REDIS_HOST` / `_PORT` | `localhost:6382` | |
+| `LEDGERFORGE_METRICS_PASSWORD` | empty | scrape password; empty means `/actuator/prometheus` is closed |
 | `LEDGERFORGE_WEBHOOK_ENCRYPTION_KEY` | dev value | encrypts signing secrets; **set in every real deployment** |
 | `LEDGERFORGE_WEBHOOKS_ALLOW_INSECURE_URLS` | `false` | allows `http://` and private addresses (local only; SSRF risk) |
 | `LEDGERFORGE_JWT_SECRET` | dev value | HS256 key, ≥ 32 bytes; **set in every real deployment** |
@@ -379,8 +439,13 @@ ledgerforge/
 - [x] **Phase 17**: Redis for rate limits, short-lived cache, distributed counters and temporary risk signals; PostgreSQL stays the source of truth
 - [x] **Phase 18**: rule-based risk engine: ALLOW / REVIEW / BLOCK with a review workflow
 - [x] **Phase 20**: Flyway layout and database constraints as defence in depth
+- [x] **Phase 21**: testing pyramid: unit, integration and E2E tiers on real infrastructure
+- [x] **Phase 22**: property and invariant tests
+- [x] **Phase 23**: Prometheus metrics, Grafana dashboard, alert rules
+- [x] **Phase 24**: structured logging with context, and tests that secrets stay out
+- [x] **Phase 25**: the whole platform with one `docker compose up`
 - [ ] **Phase 19**: virtual threads vs thread pools, measured on outbound webhook delivery
-- [ ] Micrometer metrics → Prometheus → Grafana, tracing
+- [ ] Distributed tracing
 - [ ] Reconciliation jobs, DLT replay tooling
 - [ ] OpenAPI documentation
 

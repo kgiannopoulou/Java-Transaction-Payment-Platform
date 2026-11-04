@@ -33,6 +33,9 @@ import com.kgiannopoulou.ledgerforge.shared.error.BusinessRuleViolationException
 import com.kgiannopoulou.ledgerforge.shared.error.NotFoundException;
 import com.kgiannopoulou.ledgerforge.shared.money.CurrencyMismatchException;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
+import com.kgiannopoulou.ledgerforge.shared.web.LogContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +58,8 @@ import java.util.UUID;
  */
 @Service
 public class PaymentService {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
     private final PaymentRepository payments;
     private final AccountService accountService;
@@ -86,6 +91,7 @@ public class PaymentService {
     public Payment create(CreatePaymentCommand command) {
         Payment payment = Payment.create(command.payerAccountId(), command.merchantAccountId(), command.amount(),
                 command.description(), clock.instant());
+        LogContext.put(LogContext.PAYMENT_ID, payment.getId());
         // No money moves on creation, so plain reads are enough here.
         Account payer = requireWalletIn(command.payerAccountId(), command.amount());
         Account merchant = requireWalletIn(command.merchantAccountId(), command.amount());
@@ -112,12 +118,15 @@ public class PaymentService {
                 "amount", saved.getAmount().amount().toPlainString(),
                 "currency", saved.getCurrency().getCurrencyCode(),
                 "riskOutcome", screened.outcome().name()));
+        log.info("Payment created: status={} risk={}", saved.getStatus(), screened.outcome());
         return saved;
     }
 
     /** Records a refusal. Called after the request's transaction has rolled back. */
     @Transactional
     public void recordBlocked(ScreenedPayment screened) {
+        log.info("Payment blocked by risk rules {}",
+                screened.assessment().triggered().stream().map(RiskDecision::rule).toList());
         screening.recordBlocked(screened);
         audit.record(AuditAction.PAYMENT_BLOCKED, AuditedEntity.ACCOUNT, screened.payerAccountId(), Map.of(
                 "merchantAccountId", screened.merchantAccountId().toString(),
@@ -128,6 +137,7 @@ public class PaymentService {
 
     @Transactional
     public Payment handle(PaymentCommand command) {
+        LogContext.put(LogContext.PAYMENT_ID, command.paymentId());
         Payment payment = payments.findByIdForUpdate(command.paymentId())
                 .orElseThrow(() -> new NotFoundException("Payment", command.paymentId()));
 
@@ -139,6 +149,7 @@ public class PaymentService {
             case RefundPayment refund -> refund(payment, refund.amount());
             case ReviewPayment review -> review(payment, review);
         }
+        log.info("Payment command {} applied: status={}", command.getClass().getSimpleName(), payment.getStatus());
         return payment;
     }
 

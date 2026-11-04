@@ -22,3 +22,4 @@ context, decision, consequences.
 | [0014](0014-webhook-delivery-state-machine.md) | Webhook delivery as a state machine in PostgreSQL | Accepted |
 | [0015](0015-redis-for-disposable-state-only.md) | Redis for disposable state only; PostgreSQL stays the source of truth | Accepted |
 | [0016](0016-rule-based-risk-engine.md) | A small synchronous rule engine for payment risk | Accepted |
+| [0017](0017-metrics-and-logging-rules.md) | Metrics and logging rules | Accepted |

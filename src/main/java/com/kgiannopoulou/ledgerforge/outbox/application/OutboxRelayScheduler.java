@@ -1,8 +1,6 @@
 package com.kgiannopoulou.ledgerforge.outbox.application;
 
 import com.kgiannopoulou.ledgerforge.outbox.domain.OutboxStore;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,11 +25,8 @@ public class OutboxRelayScheduler {
     private final OutboxRelay relay;
 
     public OutboxRelayScheduler(OutboxStore store, OutboxTransport transport, TransactionTemplate transactions,
-                                OutboxProperties properties, Clock clock, MeterRegistry meters) {
+                                OutboxProperties properties, Clock clock) {
         this.relay = new OutboxRelay(store, transport, transactions, properties, clock);
-        Gauge.builder("ledgerforge.outbox.pending", store, OutboxStore::countPending)
-                .description("Outbox events not yet published to Kafka")
-                .register(meters);
     }
 
     @Scheduled(fixedDelayString = "${ledgerforge.outbox.relay.poll-interval-ms:500}")

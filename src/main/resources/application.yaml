@@ -34,7 +34,7 @@ spring:
   data:
     redis:
       host: ${LEDGERFORGE_REDIS_HOST:localhost}
-      port: ${LEDGERFORGE_REDIS_PORT:6381}
+      port: ${LEDGERFORGE_REDIS_PORT:6382}
       # Short on purpose: Redis is an optimisation, and a hanging one must not hang payments.
       timeout: 200ms
       connect-timeout: 200ms
@@ -76,7 +76,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
@@ -84,6 +84,11 @@ management:
       # Health is public (probes); component details only for admins.
       show-details: when-authorized
       roles: ADMIN
+  metrics:
+    distribution:
+      # Histogram buckets, so Prometheus can compute p95 latency per endpoint.
+      percentiles-histogram:
+        http.server.requests: true
 
 ledgerforge:
   concurrency:
@@ -107,6 +112,10 @@ ledgerforge:
       # secret store, or validate tokens from an identity provider instead.
       secret: ${LEDGERFORGE_JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
       ttl: 1h
+    metrics:
+      # HTTP Basic password for Prometheus on /actuator/prometheus (user "prometheus"). Empty means
+      # nobody can scrape: metrics reveal traffic volumes, so they are closed by default.
+      password: ${LEDGERFORGE_METRICS_PASSWORD:}
     dev-tokens:
       # POST /api/v1/auth/token mints tokens for any role. Never enable outside local/demo.
       enabled: ${LEDGERFORGE_DEV_TOKENS:false}

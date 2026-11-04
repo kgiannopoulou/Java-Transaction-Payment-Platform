@@ -108,7 +108,7 @@ PostgreSQL (frozen account, large transaction) still do, and the decision is sto
 | Setting | Value | Why |
 |---------|-------|-----|
 | `timeout`, `connect-timeout` | 200 ms | a hanging Redis must not hang payments |
-| `LEDGERFORGE_REDIS_HOST` / `_PORT` | `localhost:6381` | |
+| `LEDGERFORGE_REDIS_HOST` / `_PORT` | `localhost:6382` | |
 
 During an outage each Redis call costs up to the timeout, so a request is slower but still works.
 A circuit breaker would remove that cost. It was left out because the timeout bounds the damage.

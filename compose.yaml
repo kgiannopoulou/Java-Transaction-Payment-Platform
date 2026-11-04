@@ -1,9 +1,12 @@
-# Local stack: PostgreSQL + Kafka + Redis + LedgerForge.
-#   docker compose up --build              -> API on http://localhost:8080
-#   docker compose up -d postgres kafka redis  -> infrastructure only, then ./mvnw spring-boot:run
+# The whole platform with one command:
+#
+#   docker compose up                  API on http://localhost:8080, Grafana on http://localhost:3002
+#   docker compose --profile demo up   the same, plus generated traffic for the dashboards
+#
+# For development: docker compose up -d postgres kafka redis, then ./mvnw spring-boot:run
 #
 # Dev tokens are enabled here (POST /api/v1/auth/token) so the API can be explored without an
-# identity provider. Never enable them anywhere else.
+# identity provider. These settings are for a local demo: never enable them anywhere else.
 name: ledgerforge
 
 services:
@@ -52,7 +55,7 @@ services:
     # No persistence, on purpose: everything in Redis is disposable by design (docs/redis.md).
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
-      - "6381:6379"   # 6381 on the host to avoid clashing with a local Redis
+      - "6382:6379"   # 6382 on the host to avoid clashing with a local Redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -79,9 +82,61 @@ services:
       LEDGERFORGE_REDIS_PORT: 6379
       LEDGERFORGE_DEV_TOKENS: "true"
       LEDGERFORGE_WEBHOOKS_ALLOW_INSECURE_URLS: "true"   # receivers on the local network
+      LEDGERFORGE_METRICS_PASSWORD: dev-only-metrics-password   # matches docker/prometheus/prometheus.yml
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs   # one JSON object per log line
     ports:
-      - "8080:8080"
+      - "${LEDGERFORGE_HTTP_PORT:-8080}:8080"
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${LEDGERFORGE_PROMETHEUS_PORT:-9091}:9090"   # 9091 on the host to avoid clashing with a local Prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      # Opens straight to the dashboard, read-only, with no login. For a local demo only.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/ledgerforge.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${LEDGERFORGE_GRAFANA_PORT:-3002}:3000"   # 3002 on the host to avoid clashing with local dev servers
+
+  # Optional traffic so the dashboards have something to show.
+  demo-traffic:
+    profiles: [demo]
+    image: alpine:3.21
+    restart: on-failure   # starts over if the app restarts underneath it
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./docker/demo/traffic.sh:/traffic.sh:ro
+    command: ["sh", "/traffic.sh"]
 
 volumes:
   postgres-data:
+  prometheus-data:

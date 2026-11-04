@@ -4,6 +4,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import com.kgiannopoulou.ledgerforge.idempotency.api.IdempotencyHeaders;
 import com.kgiannopoulou.ledgerforge.idempotency.application.IdempotentOperations;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
+import com.kgiannopoulou.ledgerforge.transfer.application.TransferMetrics;
+import com.kgiannopoulou.ledgerforge.transfer.application.TransferMetrics.Outcome;
 import com.kgiannopoulou.ledgerforge.transfer.application.TransferService;
 import com.kgiannopoulou.ledgerforge.transfer.application.TransferService.TransferCommand;
 import jakarta.validation.Valid;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.util.UUID;
 
 @RestController
@@ -25,10 +28,12 @@ class TransferController {
 
     private final TransferService transferService;
     private final IdempotentOperations idempotent;
+    private final TransferMetrics metrics;
 
-    TransferController(TransferService transferService, IdempotentOperations idempotent) {
+    TransferController(TransferService transferService, IdempotentOperations idempotent, TransferMetrics metrics) {
         this.transferService = transferService;
         this.idempotent = idempotent;
+        this.metrics = metrics;
     }
 
     /**
@@ -43,9 +48,16 @@ class TransferController {
             @Valid @RequestBody CreateTransferRequest request) {
         var command = new TransferCommand(request.sourceAccountId(), request.destinationAccountId(),
                 Money.of(request.amount(), request.currency()));
-        var result = idempotent.execute("transfer", idempotencyKey, request, TransferResponse.class,
-                HttpStatus.CREATED.value(), () -> TransferResponse.from(transferService.transfer(command)));
-        return IdempotencyHeaders.respond(result);
+        long start = System.nanoTime();
+        Outcome outcome = Outcome.FAILED;
+        try {
+            var result = idempotent.execute("transfer", idempotencyKey, request, TransferResponse.class,
+                    HttpStatus.CREATED.value(), () -> TransferResponse.from(transferService.transfer(command)));
+            outcome = result.replayed() ? Outcome.REPLAYED : Outcome.COMPLETED;
+            return IdempotencyHeaders.respond(result);
+        } finally {
+            metrics.record(outcome, Duration.ofNanos(System.nanoTime() - start));
+        }
     }
 
     @GetMapping("/{id}")

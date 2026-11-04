@@ -17,8 +17,11 @@ import com.kgiannopoulou.ledgerforge.shared.error.BusinessRuleViolationException
 import com.kgiannopoulou.ledgerforge.shared.error.NotFoundException;
 import com.kgiannopoulou.ledgerforge.shared.money.CurrencyMismatchException;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
+import com.kgiannopoulou.ledgerforge.shared.web.LogContext;
 import com.kgiannopoulou.ledgerforge.transfer.domain.Transfer;
 import com.kgiannopoulou.ledgerforge.transfer.domain.TransferRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,8 @@ import java.util.UUID;
 
 @Service
 public class TransferService {
+
+    private static final Logger log = LoggerFactory.getLogger(TransferService.class);
 
     private final TransferRepository transfers;
     private final AccountLocks accountLocks;
@@ -91,6 +96,7 @@ public class TransferService {
 
         Transfer transfer = transfers.save(
                 Transfer.initiate(source.getId(), destination.getId(), amount, clock.instant()));
+        LogContext.put(LogContext.TRANSFER_ID, transfer.getId());
         LedgerTransaction booked = ledgerService.post(
                 transfer.ledgerReference(),
                 LedgerTransactionType.TRANSFER,
@@ -107,6 +113,7 @@ public class TransferService {
                 "ledgerTransactionId", booked.getId().toString()));
         events.publish(new TransferCompletedEvent(UUID.randomUUID(), transfer.getId(), source.getId(),
                 destination.getId(), amount.amount(), amount.currency(), clock.instant()));
+        log.info("Transfer completed");
         return transfer;
     }
 

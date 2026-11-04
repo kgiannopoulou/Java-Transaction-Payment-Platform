@@ -88,7 +88,7 @@ COMMIT
   stops at the first failure.
 - **Several relay instances** can run: `FOR UPDATE SKIP LOCKED` hands each row to one of them.
 - **Housekeeping:** published rows are deleted after 7 days; the gauge
-  `ledgerforge.outbox.pending` exposes the backlog.
+  `outbox_pending_events` exposes the backlog.
 
 ## Consumers: retries, backoff, DLT, idempotency
 

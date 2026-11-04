@@ -79,7 +79,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ProblemDetail> handleIntegrity(DataIntegrityViolationException e) {
         // Normally prevented by explicit checks; reaching this means a race lost to a DB constraint.
-        log.warn("Data integrity violation: {}", e.getMostSpecificCause().getMessage());
+        // First line only. PostgreSQL's "Detail:" line repeats the row's values, such as an email address.
+        log.warn("Data integrity violation: {}",
+                String.valueOf(e.getMostSpecificCause().getMessage()).lines().findFirst().orElse(""));
         return respond(problem(HttpStatus.CONFLICT, "CONSTRAINT_VIOLATION", "Conflicting data",
                 "The request conflicts with existing data"));
     }

@@ -39,8 +39,7 @@ the service could later be split.
   Redis 7 (disposable): rate limits, ownership cache, risk signals
 ```
 
-Still deliberately absent: dashboards (metrics are exposed via Actuator/Micrometer;
-Prometheus/Grafana come next).
+Prometheus scrapes the service and Grafana shows it; see [observability.md](observability.md).
 
 ## Modules
 
@@ -125,5 +124,5 @@ event to Kafka, and the risk consumer processes it idempotently (see [outbox.md]
 - **One error shape** (RFC 9457 problem details) for every error: stable `type`, `title`, `status`,
   `detail` and a `traceId` that also appears in the `X-Trace-Id` header and in the logs. See
   [`error-handling.md`](error-handling.md).
-- **Actuator** health (with liveness/readiness probes), info and metrics. Compose enables ECS-format
-  structured JSON logs.
+- **Actuator** health (with liveness/readiness probes), info, metrics and Prometheus. Compose enables
+  ECS-format structured JSON logs ([logging.md](logging.md)).

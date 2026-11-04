@@ -7,13 +7,19 @@ import com.kgiannopoulou.ledgerforge.payment.domain.PaymentAlreadyCapturedExcept
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.MDC;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ProblemDetail;
 
+import java.sql.SQLException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
 
     private final ApiExceptionHandler handler = new ApiExceptionHandler();
@@ -35,6 +41,17 @@ class ApiExceptionHandlerTest {
         assertThat(problem.getType()).hasToString("INTERNAL_ERROR");
         assertThat(problem.getDetail()).doesNotContain("hunter2", "postgresql", "IllegalStateException");
         assertThat(problem.getProperties()).containsEntry("traceId", "trace-1234");
+    }
+
+    @Test
+    void constraintViolationsAreLoggedWithoutTheRowsValues(CapturedOutput output) {
+        var cause = new SQLException("""
+                ERROR: duplicate key value violates unique constraint "ux_customers_email"
+                  Detail: Key (lower(email::text))=(private.person@example.com) already exists.""");
+
+        handler.handleIntegrity(new DataIntegrityViolationException("could not execute statement", cause));
+
+        assertThat(output.getAll()).contains("ux_customers_email").doesNotContain("private.person@example.com");
     }
 
     @Test

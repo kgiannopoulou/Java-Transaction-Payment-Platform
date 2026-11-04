@@ -3,13 +3,17 @@ package com.kgiannopoulou.ledgerforge.security.infrastructure;
 import com.kgiannopoulou.ledgerforge.security.application.JwtProperties;
 import com.kgiannopoulou.ledgerforge.security.application.JwtTokenIssuer;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -18,6 +22,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 import javax.crypto.SecretKey;
@@ -37,6 +43,35 @@ class SecurityConfiguration {
     private static final String SUPPORT = "SUPPORT";
     private static final String AUDITOR = "AUDITOR";
     private static final String ADMIN = "ADMIN";
+    private static final String METRICS = "METRICS";
+
+    /**
+     * Prometheus cannot present a short-lived JWT, so this one endpoint has its own chain with HTTP
+     * Basic and a dedicated user that can do nothing else. With no password configured there is no
+     * user, and nobody can scrape.
+     */
+    @Bean
+    @Order(1)
+    SecurityFilterChain metricsSecurity(HttpSecurity http, ProblemJsonSecurityHandlers problemHandlers,
+                                        @Value("${ledgerforge.security.metrics.password:}") String password)
+            throws Exception {
+        var users = new InMemoryUserDetailsManager();
+        if (!password.isBlank()) {
+            var encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+            users.createUser(User.withUsername("prometheus").password(encoder.encode(password)).roles(METRICS).build());
+        }
+        http
+                .securityMatcher("/actuator/prometheus")
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .userDetailsService(users)
+                .authorizeHttpRequests(auth -> auth.anyRequest().hasRole(METRICS))
+                .httpBasic(basic -> basic.authenticationEntryPoint(problemHandlers))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(problemHandlers)
+                        .accessDeniedHandler(problemHandlers));
+        return http.build();
+    }
 
     @Bean
     SecurityFilterChain apiSecurity(HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter,
@@ -90,7 +125,8 @@ class SecurityConfiguration {
                         .accessDeniedHandler(problemHandlers))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(problemHandlers)
-                        .accessDeniedHandler(problemHandlers));
+                        .accessDeniedHandler(problemHandlers))
+                .addFilterAfter(new CustomerLoggingFilter(), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 

@@ -76,6 +76,6 @@ public class RiskAssessmentService {
         }
         alerts.save(new RiskAlert(UUID.randomUUID(), eventId, rule, accountId, referenceType, referenceId,
                 amount, currency, clock.instant()));
-        log.info("Risk alert {} for {} {} ({} {})", rule, referenceType, referenceId, amount, currency);
+        log.info("Risk alert {} for {} {}", rule, referenceType, referenceId);
     }
 }

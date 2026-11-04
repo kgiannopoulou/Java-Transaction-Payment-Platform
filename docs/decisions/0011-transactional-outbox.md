@@ -28,4 +28,4 @@ across PostgreSQL and Kafka is not a realistic option.
   idempotent (ADR 0012).
 - Publishing latency ≈ poll interval (500 ms).
 - The outbox table needs housekeeping (published rows deleted after 7 days) and monitoring
-  (`ledgerforge.outbox.pending`).
+  (`outbox_pending_events`).

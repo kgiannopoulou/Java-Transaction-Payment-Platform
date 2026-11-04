@@ -78,6 +78,9 @@ enumerate valid account ids. Staff roles, who are allowed to know, get the usual
   use up someone else's allowance ([redis.md](redis.md)).
 - **Risk screening** refuses or holds payments, and a refusal never says which rule fired
   ([risk-engine.md](risk-engine.md)).
+- **Metrics**: `/actuator/prometheus` has its own HTTP Basic user, which can read nothing else, and
+  is closed unless a password is configured ([observability.md](observability.md)).
+- **Logs** hold identifiers, never tokens, secrets or personal data ([logging.md](logging.md)).
 - **Webhooks** are outbound calls to customer-chosen URLs, so they have SSRF protection and
   encrypted signing secrets ([webhooks.md](webhooks.md)).
 

@@ -1,13 +1,16 @@
 package com.kgiannopoulou.ledgerforge.webhook.application;
 
+import com.kgiannopoulou.ledgerforge.shared.web.LogContext;
 import com.kgiannopoulou.ledgerforge.webhook.domain.ClaimedDelivery;
 import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookAttempt;
 import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookAttemptOutcome;
 import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookDeliveryRepository;
 import com.kgiannopoulou.ledgerforge.webhook.domain.WebhookSignature;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -54,6 +57,7 @@ public class WebhookDispatcher {
     private final Duration lease;
     private final int batchSize;
     private final Semaphore slots;
+    private final Counter failures;
 
     public WebhookDispatcher(WebhookDeliveryRepository deliveries, WebhookSender sender, WebhookSecrets secrets,
                              WebhookUrlPolicy urlPolicy, WebhookWorkers workers, TransactionTemplate transactions,
@@ -70,6 +74,9 @@ public class WebhookDispatcher {
         this.lease = properties.requestTimeout().plus(LEASE_MARGIN);
         this.batchSize = properties.dispatcher().batchSize();
         this.slots = new Semaphore(workers.capacity());
+        // Registered up front: a counter that first appears on the first failure shows as "no data",
+        // which looks like broken monitoring rather than a healthy zero.
+        this.failures = meters.counter("webhook.failures");
     }
 
     /** Claims and starts due deliveries without waiting for them. Returns how many were started. */
@@ -97,6 +104,14 @@ public class WebhookDispatcher {
     }
 
     private void attempt(ClaimedDelivery delivery) {
+        // A worker thread has no request around it, so it sets its own log context.
+        try (var deliveryId = MDC.putCloseable(LogContext.DELIVERY_ID, delivery.id().toString());
+             var eventId = MDC.putCloseable(LogContext.EVENT_ID, delivery.eventId().toString())) {
+            attemptInContext(delivery);
+        }
+    }
+
+    private void attemptInContext(ClaimedDelivery delivery) {
         Instant startedAt = clock.instant();
         long start = System.nanoTime();
         WebhookResponse response = delivery.endpointActive()
@@ -126,9 +141,12 @@ public class WebhookDispatcher {
 
         meters.counter("ledgerforge.webhooks.attempts",
                 "outcome", response.isSuccess() ? "success" : "failure").increment();
+        if (!response.isSuccess()) {
+            failures.increment();
+        }
         if (!response.isSuccess() && retryIn.isEmpty()) {
             meters.counter("ledgerforge.webhooks.dead").increment();
-            log.warn("Webhook delivery {} is dead after attempt {}: {}", delivery.id(), delivery.attemptNumber(), error);
+            log.warn("Webhook delivery is dead after attempt {}: {}", delivery.attemptNumber(), error);
         }
     }
 

@@ -30,7 +30,7 @@ class TraceIdFilter extends OncePerRequestFilter {
         try {
             chain.doFilter(request, response);
         } finally {
-            MDC.remove(TraceIds.MDC_KEY);
+            MDC.clear(); // the trace id and everything LogContext added during the request
         }
     }
 }
