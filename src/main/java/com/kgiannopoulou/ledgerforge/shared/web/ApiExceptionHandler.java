@@ -5,6 +5,7 @@ import com.kgiannopoulou.ledgerforge.shared.error.ConflictException;
 import com.kgiannopoulou.ledgerforge.shared.error.DomainException;
 import com.kgiannopoulou.ledgerforge.shared.error.InvalidRequestException;
 import com.kgiannopoulou.ledgerforge.shared.error.NotFoundException;
+import com.kgiannopoulou.ledgerforge.shared.error.TooManyRequestsException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,9 +59,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             case BusinessRuleViolationException ignored -> HttpStatus.UNPROCESSABLE_CONTENT;
             case ConflictException ignored -> HttpStatus.CONFLICT;
             case InvalidRequestException ignored -> HttpStatus.BAD_REQUEST;
+            case TooManyRequestsException ignored -> HttpStatus.TOO_MANY_REQUESTS;
         };
         log.debug("Request rejected: {} - {}", e.type(), e.getMessage());
-        return respond(problem(status, e.type(), e.title(), e.getMessage()));
+        ProblemDetail problem = problem(status, e.type(), e.title(), e.getMessage());
+        if (e instanceof TooManyRequestsException limited) {
+            long seconds = Math.max(1, (limited.retryAfter().toMillis() + 999) / 1000); // whole seconds, rounded up
+            return ResponseEntity.status(status).header(HttpHeaders.RETRY_AFTER, Long.toString(seconds)).body(problem);
+        }
+        return respond(problem);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

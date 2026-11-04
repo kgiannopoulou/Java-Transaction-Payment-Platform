@@ -31,6 +31,15 @@ spring:
       # Pure JSON API: no static content. Unknown routes then raise NoHandlerFoundException,
       # which ApiExceptionHandler renders in the standard error shape.
       add-mappings: false
+  data:
+    redis:
+      host: ${LEDGERFORGE_REDIS_HOST:localhost}
+      port: ${LEDGERFORGE_REDIS_PORT:6381}
+      # Short on purpose: Redis is an optimisation, and a hanging one must not hang payments.
+      timeout: 200ms
+      connect-timeout: 200ms
+      repositories:
+        enabled: false
   kafka:
     bootstrap-servers: ${LEDGERFORGE_KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
     producer:
@@ -120,6 +129,10 @@ ledgerforge:
       max-retries: 4
       partitions: 3
       replication-factor: 1
+  rate-limit:
+    payments:
+      limit: 100
+      window: 1m
   risk:
     large-amount-threshold: 10000.00
   webhooks:

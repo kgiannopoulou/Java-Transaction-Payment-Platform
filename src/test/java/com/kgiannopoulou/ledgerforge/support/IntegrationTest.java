@@ -9,5 +9,6 @@ public abstract class IntegrationTest extends ApiTestSupport {
     @DynamicPropertySource
     static void sharedDatabase(DynamicPropertyRegistry registry) {
         PostgresContainers.register(registry, PostgresContainers.SHARED);
+        RedisContainers.register(registry, RedisContainers.SHARED);
     }
 }

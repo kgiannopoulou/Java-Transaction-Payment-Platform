@@ -10,6 +10,7 @@ import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.AuthorizePaym
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.CancelPayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.CapturePayment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentCommand.RefundPayment;
+import com.kgiannopoulou.ledgerforge.ratelimit.application.RateLimiter;
 import com.kgiannopoulou.ledgerforge.shared.money.Money;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -30,10 +31,12 @@ class PaymentController {
 
     private final PaymentService paymentService;
     private final IdempotentOperations idempotent;
+    private final RateLimiter rateLimiter;
 
-    PaymentController(PaymentService paymentService, IdempotentOperations idempotent) {
+    PaymentController(PaymentService paymentService, IdempotentOperations idempotent, RateLimiter rateLimiter) {
         this.paymentService = paymentService;
         this.idempotent = idempotent;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping
@@ -41,6 +44,8 @@ class PaymentController {
     ResponseEntity<PaymentResponse> create(
             @RequestHeader(name = IdempotencyHeaders.KEY, required = false) String idempotencyKey,
             @Valid @RequestBody CreatePaymentRequest request) {
+        // After @PreAuthorize, so a caller can only spend the allowance of an account they own.
+        rateLimiter.checkPaymentCreation(request.payerAccountId());
         var command = new CreatePaymentCommand(request.payerAccountId(), request.merchantAccountId(),
                 Money.of(request.amount(), request.currency()), request.description());
         var result = idempotent.execute("payment.create", idempotencyKey, request, PaymentResponse.class,

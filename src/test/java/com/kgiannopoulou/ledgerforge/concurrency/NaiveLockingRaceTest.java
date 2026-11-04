@@ -5,6 +5,7 @@ import com.kgiannopoulou.ledgerforge.support.ApiClient;
 import com.kgiannopoulou.ledgerforge.support.Concurrently;
 import com.kgiannopoulou.ledgerforge.support.ApiTestSupport;
 import com.kgiannopoulou.ledgerforge.support.PostgresContainers;
+import com.kgiannopoulou.ledgerforge.support.RedisContainers;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -45,6 +46,7 @@ class NaiveLockingRaceTest extends ApiTestSupport {
     @DynamicPropertySource
     static void isolatedDatabase(DynamicPropertyRegistry registry) {
         PostgresContainers.register(registry, ISOLATED);
+        RedisContainers.register(registry, RedisContainers.SHARED);
     }
 
     @Test

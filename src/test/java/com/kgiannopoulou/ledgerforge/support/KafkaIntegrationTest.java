@@ -24,6 +24,7 @@ public abstract class KafkaIntegrationTest extends ApiTestSupport {
     @DynamicPropertySource
     static void eventPipeline(DynamicPropertyRegistry registry) {
         PostgresContainers.register(registry, PostgresContainers.SHARED);
+        RedisContainers.register(registry, RedisContainers.SHARED);
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         registry.add("spring.kafka.admin.auto-create", () -> "true");
         registry.add("ledgerforge.outbox.relay.enabled", () -> "true");

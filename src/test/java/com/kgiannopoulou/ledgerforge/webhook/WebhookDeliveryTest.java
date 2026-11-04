@@ -6,6 +6,7 @@ import com.kgiannopoulou.ledgerforge.support.ApiClient;
 import com.kgiannopoulou.ledgerforge.support.ApiTestSupport;
 import com.kgiannopoulou.ledgerforge.support.Concurrently;
 import com.kgiannopoulou.ledgerforge.support.PostgresContainers;
+import com.kgiannopoulou.ledgerforge.support.RedisContainers;
 import com.kgiannopoulou.ledgerforge.support.WebhookReceiverStub;
 import com.kgiannopoulou.ledgerforge.webhook.application.WebhookDispatcher;
 import com.kgiannopoulou.ledgerforge.webhook.application.WebhookEvent;
@@ -48,6 +49,7 @@ class WebhookDeliveryTest extends ApiTestSupport {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
         PostgresContainers.register(registry, DATABASE);
+        RedisContainers.register(registry, RedisContainers.SHARED);
     }
 
     @Autowired

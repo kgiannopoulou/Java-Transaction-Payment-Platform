@@ -58,7 +58,8 @@ class ArchitectureTest {
                     .should().dependOnClassesThat().resideInAnyPackage(
                             ROOT + ".account..", ROOT + ".customer..", ROOT + ".ledger..", ROOT + ".payment..",
                             ROOT + ".transfer..", ROOT + ".idempotency..", ROOT + ".audit..", ROOT + ".outbox..",
-                            ROOT + ".messaging..", ROOT + ".risk..", ROOT + ".webhook..", ROOT + ".security..");
+                            ROOT + ".messaging..", ROOT + ".risk..", ROOT + ".webhook..", ROOT + ".security..",
+                            ROOT + ".ratelimit..");
 
     @ArchTest
     static final ArchRule controllers_live_in_api_packages =
@@ -70,6 +71,18 @@ class ArchitectureTest {
                     .should().callMethod(Account.class, "debit", Money.class)
                     .orShould().callMethod(Account.class, "credit", Money.class)
                     .because("every balance change must be part of a balanced ledger transaction");
+
+    @ArchTest
+    static final ArchRule the_financial_core_never_touches_redis =
+            noClasses().that().resideInAnyPackage(ROOT + ".ledger..", ROOT + ".account..", ROOT + ".transfer..",
+                            ROOT + ".payment..")
+                    .should().dependOnClassesThat().resideInAPackage(ROOT + ".shared.ephemeral..")
+                    .because("balances and payments live in PostgreSQL; Redis holds disposable data only");
+
+    @ArchTest
+    static final ArchRule redis_stays_behind_the_port =
+            noClasses().that().resideOutsideOfPackage(ROOT + ".infrastructure..")
+                    .should().dependOnClassesThat().resideInAPackage("org.springframework.data.redis..");
 
     @ArchTest
     static final ArchRule no_floating_point_money =

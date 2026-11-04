@@ -1,6 +1,5 @@
 package com.kgiannopoulou.ledgerforge.security.application;
 
-import com.kgiannopoulou.ledgerforge.account.domain.AccountRepository;
 import com.kgiannopoulou.ledgerforge.payment.domain.Payment;
 import com.kgiannopoulou.ledgerforge.payment.domain.PaymentRepository;
 import com.kgiannopoulou.ledgerforge.security.domain.Role;
@@ -30,15 +29,15 @@ import java.util.function.Function;
 @Transactional(readOnly = true)
 public class AccessPolicy {
 
-    private final AccountRepository accounts;
+    private final AccountOwners owners;
     private final TransferRepository transfers;
     private final PaymentRepository payments;
     private final WebhookEndpointRepository webhookEndpoints;
     private final WebhookDeliveryRepository webhookDeliveries;
 
-    public AccessPolicy(AccountRepository accounts, TransferRepository transfers, PaymentRepository payments,
+    public AccessPolicy(AccountOwners owners, TransferRepository transfers, PaymentRepository payments,
                         WebhookEndpointRepository webhookEndpoints, WebhookDeliveryRepository webhookDeliveries) {
-        this.accounts = accounts;
+        this.owners = owners;
         this.transfers = transfers;
         this.payments = payments;
         this.webhookEndpoints = webhookEndpoints;
@@ -64,7 +63,7 @@ public class AccessPolicy {
     /** Strict ownership: required to move money out of an account. Staff roles never pass. */
     public boolean ownsAccount(UUID accountId) {
         return CurrentPrincipal.customerId()
-                .map(caller -> accounts.findCustomerIdById(accountId).map(caller::equals).orElse(false))
+                .map(caller -> owners.ownerOf(accountId).map(caller::equals).orElse(false))
                 .orElse(false);
     }
 

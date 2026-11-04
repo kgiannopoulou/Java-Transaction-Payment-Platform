@@ -1,6 +1,6 @@
-# Local stack: PostgreSQL + Kafka + LedgerForge.
+# Local stack: PostgreSQL + Kafka + Redis + LedgerForge.
 #   docker compose up --build              -> API on http://localhost:8080
-#   docker compose up -d postgres kafka    -> infrastructure only, then ./mvnw spring-boot:run
+#   docker compose up -d postgres kafka redis  -> infrastructure only, then ./mvnw spring-boot:run
 #
 # Dev tokens are enabled here (POST /api/v1/auth/token) so the API can be explored without an
 # identity provider. Never enable them anywhere else.
@@ -47,6 +47,18 @@ services:
       timeout: 10s
       retries: 20
 
+  redis:
+    image: redis:7.4-alpine
+    # No persistence, on purpose: everything in Redis is disposable by design (docs/redis.md).
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6381:6379"   # 6381 on the host to avoid clashing with a local Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   app:
     build:
       context: .
@@ -56,11 +68,15 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       LEDGERFORGE_DB_URL: jdbc:postgresql://postgres:5432/ledgerforge
       LEDGERFORGE_DB_USER: ledgerforge
       LEDGERFORGE_DB_PASSWORD: ledgerforge
       LEDGERFORGE_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LEDGERFORGE_REDIS_HOST: redis
+      LEDGERFORGE_REDIS_PORT: 6379
       LEDGERFORGE_DEV_TOKENS: "true"
       LEDGERFORGE_WEBHOOKS_ALLOW_INSECURE_URLS: "true"   # receivers on the local network
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs   # one JSON object per log line

@@ -3,7 +3,7 @@ package com.kgiannopoulou.ledgerforge.shared.error;
 /**
  * Base type for expected business failures.
  *
- * <p>The hierarchy is sealed into four categories, and each category maps to exactly one HTTP
+ * <p>The hierarchy is sealed into five categories, and each category maps to exactly one HTTP
  * status in {@code ApiExceptionHandler}. Concrete exceptions ({@code InsufficientFundsException},
  * {@code AccountFrozenException}, ...) extend a category and supply:
  * <ul>
@@ -14,7 +14,8 @@ package com.kgiannopoulou.ledgerforge.shared.error;
  * </ul>
  */
 public abstract sealed class DomainException extends RuntimeException
-        permits NotFoundException, BusinessRuleViolationException, ConflictException, InvalidRequestException {
+        permits NotFoundException, BusinessRuleViolationException, ConflictException, InvalidRequestException,
+                TooManyRequestsException {
 
     private final String type;
 

@@ -20,3 +20,4 @@ context, decision, consequences.
 | [0012](0012-idempotent-consumers-retries-and-dlt.md) | Idempotent consumers, retries with backoff, dead-letter topics | Accepted |
 | [0013](0013-migration-layout-and-rebaseline.md) | Migration layout, and a one-time re-baseline | Accepted |
 | [0014](0014-webhook-delivery-state-machine.md) | Webhook delivery as a state machine in PostgreSQL | Accepted |
+| [0015](0015-redis-for-disposable-state-only.md) | Redis for disposable state only; PostgreSQL stays the source of truth | Accepted |
