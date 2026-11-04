@@ -16,6 +16,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<archunit.version>1.4.1</archunit.version>
+		<jqwik.version>1.9.3</jqwik.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -122,6 +123,12 @@
 		<dependency>
 			<groupId>org.awaitility</groupId>
 			<artifactId>awaitility</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.jqwik</groupId>
+			<artifactId>jqwik</artifactId>
+			<version>${jqwik.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
