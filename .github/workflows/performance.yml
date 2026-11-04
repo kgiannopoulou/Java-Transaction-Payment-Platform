@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Start the stack
         run: docker compose -f compose.yaml -f performance/compose.performance.yaml up -d --build --wait --wait-timeout 300
