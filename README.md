@@ -333,7 +333,7 @@ logs. Details in [`docs/logging.md`](docs/logging.md).
 
 ## Tests
 
-`./mvnw verify` runs **309 tests** against real PostgreSQL 17, Kafka 4.1 and Redis 7 via Testcontainers:
+`./mvnw verify` runs **359 tests** against real PostgreSQL 17, Kafka 4.1 and Redis 7 via Testcontainers:
 
 | Suite | What it proves |
 |-------|----------------|
