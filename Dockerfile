@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build -------------------------------------------------------------------------------
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:24-jdk AS build
 WORKDIR /workspace
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q package -DskipTests \
     && java -Djarmode=tools -jar target/ledgerforge-*.jar extract --layers --launcher --destination extracted
 
 # ---- runtime -----------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:24-jre
 RUN groupadd --system ledgerforge && useradd --system --gid ledgerforge ledgerforge
 WORKDIR /app
 # Layered copy: dependencies change rarely, application classes often.
